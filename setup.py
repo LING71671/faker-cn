@@ -12,7 +12,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/LING71671/faker-cn",
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests*", "testing*"]),
     include_package_data=True,
     package_data={
         "faker_cn": ["*.json", "*.gz"],
