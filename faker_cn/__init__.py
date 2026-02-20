@@ -650,15 +650,8 @@ class PersonaProvider(BaseProvider):
             
         email = kwargs.get("email") or generate_weighted_email(username, age, job)
         
-        temp_mail_configs = {
-            'yopmail.com': 'https://yopmail.com/zh/?',
-            'yopmail.net': 'https://yopmail.com/zh/?',
-            'cool.fr.nf': 'https://yopmail.com/zh/?',
-            'jetable.fr.nf': 'https://yopmail.com/zh/?'
-        }
-        temp_domain = self.random_element(list(temp_mail_configs.keys()))
-        temp_email = kwargs.get("temp_email") or f"{username}@{temp_domain}"
-        temp_email_url = f"{temp_mail_configs[temp_domain]}{username}"
+        yopmail_account = kwargs.get("yopmail") or f"{username}@yopmail.com"
+        yopmail_url = f"https://yopmail.com/zh/?login={username}"
         
         # MBTI personality type
         mbti_list = [
@@ -824,9 +817,9 @@ class PersonaProvider(BaseProvider):
             "age": age,
             "birth_date": birth_date.strftime("%Y-%m-%d"),
             "ssn": ssn,
-            "email": f"{username}@{self.generator.free_email_domain()}",
-            "temp_email": temp_email,
-            "temp_email_url": temp_email_url,
+            "email": email,
+            "yopmail": yopmail_account,
+            "yopmail_url": yopmail_url,
             "username": username,
             "password": password,
             "ethnicity": ethnicity,
