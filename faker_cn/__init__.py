@@ -25,7 +25,10 @@ class PersonaProvider(BaseProvider):
         "冯": "feng", "曾": "zeng", "程": "cheng", "蔡": "cai", "潘": "pan",
         "袁": "yuan", "于": "yu", "董": "dong", "余": "yu", "苏": "su",
         "叶": "ye", "吕": "lv", "魏": "wei", "蒋": "jiang", "田": "tian",
-        "杜": "du", "丁": "ding"
+        "杜": "du", "丁": "ding", "沈": "shen", "姜": "jiang", "范": "fan",
+        "军": "jun", "国": "guo", "建": "jian", "华": "hua", "平": "ping",
+        "伟": "wei", "强": "qiang", "勇": "yong", "明": "ming", "涛": "tao",
+        "英": "ying", "华": "hua", "秀": "xiu", "珍": "zhen", "娟": "juan"
     }
 
     def _filter_by_fields(self, data: dict, fields: list) -> dict:
@@ -385,7 +388,15 @@ class PersonaProvider(BaseProvider):
         # Simple name-based username logic
 
         username = kwargs.get("username") or self._get_linked_identity(name)
-        password = kwargs.get("password") or self.generator.password()
+        
+        # 密码逻辑强化：区分强密码与真实常用密码 (Common Habits: BirthDate + Initials)
+        initials = self._get_pinyin_initials(name).lower()
+        common_password_base = f"{birth_date.strftime('%Y%m%d')}{initials}"
+        
+        common_password = kwargs.get("common_password") or common_password_base
+        common_password_upper = kwargs.get("common_password_upper") or common_password_base.upper()
+        strong_password = kwargs.get("password") or self.generator.password()
+        
         guid = kwargs.get("guid") or str(self.generator.uuid4())
         
         temp_mail_configs = {
@@ -655,7 +666,10 @@ class PersonaProvider(BaseProvider):
             "yopmail": yopmail_account,
             "yopmail_url": yopmail_url,
             "username": username,
-            "password": password,
+            "password": strong_password,
+            "strong_password": strong_password,
+            "common_password": common_password,
+            "common_password_upper": common_password_upper,
             "ethnicity": ethnicity,
             "bank_card": bank_card,
             "bank_name": bank_name,
@@ -779,25 +793,30 @@ class PersonaProvider(BaseProvider):
         except AttributeError: return f"13{self.random_int(min=0,max=9)}{self.random_int(min=0,max=99999999):08d}"
 
     def _generate_era_name(self, birth_year, is_m):
-        # Dynamic weights instead of strict rules
-        traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛"]
-        traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴"]
-        modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航"]
-        modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵"]
-        mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞"]
-        mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹"]
+        # 1. 性别与时代的特征字库 (Strict Gender Separation)
+        # 传统：50-70年代倾向于强壮、报国、温婉、家务
+        traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛", "正", "辉", "力", "明", "永", "才"]
+        traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴", "云", "莲", "玲", "巧", "桂", "芝"]
+        
+        # 中期：80-90年代倾向于单字，追求中性或文雅
+        mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞", "博", "涛", "洋", "明", "毅"]
+        mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹", "琳", "慧", "洁", "微", "娜", "露"]
+        
+        # 现代：00-20年代倾向于古风、诗意、四个字或重叠
+        modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航", "嘉木", "一凡", "子安", "沐宸"]
+        modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵", "梦瑶", "思语", "若曦", "语珂"]
 
         r_val = random.random()
         
-        # Base probability for generic faker name
-        generic_prob = 0.4
+        # 基础 Faker 概率
+        generic_prob = 0.3
         
-        if birth_year < 1970:
-            trad_prob = 0.5
-            mid_prob = 0.1
-        elif birth_year < 1990:
+        if birth_year < 1975:
+            trad_prob = 0.6
+            mid_prob = 0.05
+        elif birth_year < 1995:
             trad_prob = 0.1
-            mid_prob = 0.4
+            mid_prob = 0.5
         elif birth_year < 2010:
             trad_prob = 0.05
             mid_prob = 0.2
@@ -807,8 +826,13 @@ class PersonaProvider(BaseProvider):
             
         modern_prob = 1.0 - generic_prob - trad_prob - mid_prob
 
+        # 始终先获取姓氏，确保架构统一
+        surname = self.generator.last_name()
+
         if r_val < generic_prob:
-             return getattr(self.generator, "name_male")() if is_m else getattr(self.generator, "name_female")()
+             # 使用原生 Faker 的名（而非全名），避免性别混淆或重复姓氏
+             given_name = self.generator.first_name_male() if is_m else self.generator.first_name_female()
+             return f"{surname}{given_name}"
         elif r_val < generic_prob + trad_prob:
              name_char = self.random_element(traditional_m) if is_m else self.random_element(traditional_f)
         elif r_val < generic_prob + trad_prob + mid_prob:
@@ -816,10 +840,6 @@ class PersonaProvider(BaseProvider):
         else:
              name_char = self.random_element(modern_m) if is_m else self.random_element(modern_f)
              
-        # Extract a random surname from the builtin generator
-        full_name_stub = self.generator.name()
-        # Chinese surnames are mostly 1 character, occasionally 2
-        surname = full_name_stub[0] if len(full_name_stub) > 1 else self.random_element(["王", "李", "张", "刘", "陈"])
         return f"{surname}{name_char}"
 
     def _generate_realistic_postcode(self, full_pc_index, p_n, c_n, a_n):
@@ -862,6 +882,17 @@ class PersonaProvider(BaseProvider):
         bt = self.random_element(["O"] * 32 + ["A"] * 28 + ["B"] * 30 + ["AB"] * 10)
         rh = "-" if random.random() < 0.003 else "+"
         return f"{bt}{rh}"
+
+    def _get_pinyin_initials(self, name: str) -> str:
+        res = ""
+        for char in name:
+            p = self._pinyin_map.get(char, "")
+            if p:
+                res += p[0]
+            else:
+                # Fallback to a random consonant if not in map to maintain structure
+                res += self.random_element("abcdefghjklmnopqrstuvwxyz")
+        return res
 
     def _get_linked_identity(self, full_name: str):
         # If name is '张三', try 'zhangsan', 'san.zhang', etc.
