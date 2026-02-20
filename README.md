@@ -1,8 +1,9 @@
 # faker-cn
 
-`faker-cn` 是 [Python Faker](https://faker.readthedocs.io/en/master/) 的独立第三方提供者 (Provider)，专门针对中国大陆身份数据进行了高精度的严谨构造和校验。
+`faker-cn` 是官方原版 [Python Faker](https://github.com/joke2k/faker) 的完全独立第三方提供者 (Provider)。
+> **注意**：本项目作为原生扩展独立运行，与任何修改了 Faker 源码且未提交 PR 的个人魔改版**均无关联**，您可以直接在官方标准版的 Faker 环境中无缝挂载使用。
 
-它是强大的 [faker-plus](https://github.com/LING71671/faker-plus) 命令行工具底层剥离出的核心生成引擎。
+它专门针对中国大陆身份数据进行了高精度的严谨构造和校验，最初从强大的 [faker-plus](https://github.com/LING71671/faker-plus) 命令行工具底层剥离抽出，现作为核心数据生成引擎独立维护。
 
 ## 🎯 核心能力
 与官方 Faker 默认的随机字符串拼凑不同，`faker-cn` 专注于数据的**强社会逻辑自洽**：
@@ -56,4 +57,4 @@ python build_dicts.py
 ```
 
 ## 协议
-MIT License
+[GPL-3.0 License](LICENSE)
