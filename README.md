@@ -11,8 +11,8 @@
 
 区别于传统的随机生成，`faker-cn` 注入了大量符合现实国情的逻辑判断：
 
-1. **具有时代感的姓名 (Era-based Probabilistic Names)**
-   - 抛弃生硬的穷举。70后有 50% 概率叫“建军、淑兰”；10后有超 90% 的概率叫“子涵、宇轩”。姓名分布严格吻合年代缩影。
+1. **具有时代感的姓名 (Era-based Probabilistic & Gender-Strict Names)**
+   - 抛弃生硬的穷举。70后有 50% 概率叫“建军、淑兰”；10后有超 90% 的概率叫“子涵、宇轩”。**姓名分布严格吻合年代缩影，且实现了极高精度的性别特征隔离（如男性绝不会叫“丽娟”）。**
 2. **逻辑自洽的财产与车辆 (Contextual Assets & Vehicle Plates)**
    - 模拟真实 25% 车主比例，车主身份与**年龄（25-55岁）和月薪（>15k概率极高）强绑定**。
    - **真实人生轨迹的车牌**：车牌前缀 60% 落实在工作地，30% 落实在户籍地，10% 模拟在教育大省（如湖北、江苏）上牌。更有 15% 的几率生成新能源绿牌（带 D/F 标识）。
@@ -140,7 +140,10 @@ print(mini_person)
 | `ssn` | String | 完美的 18 位大陆身份证号 |
 | `email` | String | 常规主邮箱（年轻人偏 QQ，高阶偏 Gmail/163） |
 | `yopmail` / `yopmail_url` | String | **神器**：必定生成的一个 Yopmail 邮箱及一键直达链接 |
-| `username` / `password` | String | 用户名与密码 |
+| `username` / `password` | String | 用户名与强随机密码（兼容旧版 `password`） |
+| `common_password` | String | **新特性**：模拟国民习惯的“出生日期+拼音首字母”（如 `19900101zs`） |
+| `common_password_upper` | String | 同上，但拼音部分为大写 |
+| `strong_password` | String | 高强度随机密码（同 `password`） |
 | `bank_card` / `bank_name`| String | 银行卡号（通过 Luhn 校验）及所属银行 |
 | `mbti` | String | 16种 MBTI 人格类型 |
 | `ethnicity` | String | 民族（地理感知分布） |
