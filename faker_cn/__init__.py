@@ -118,6 +118,84 @@ class PersonaProvider(BaseProvider):
         random_days = self.random_int(min=0, max=delta.days)
         return start + timedelta(days=random_days)
 
+    def _generate_full_address(self, p_data, c_data, a_data, villages, f_urban=False):
+        t_list = a_data.get('children', [])
+        if f_urban and t_list:
+            urban_t = [t for t in t_list if any(kw in t['name'] for kw in ["街道", "地区", "开发区"])]
+            if urban_t: t_list = urban_t
+
+        if not t_list:
+            t_n, t_c = "", ""
+        else:
+            t_obj = self.random_element(t_list)
+            t_n, t_c = t_obj['name'], t_obj.get('code', '')
+
+        is_u = False
+        if t_n:
+            if any(kw in t_n for kw in ["街道", "地区", "社区", "开发区"]): is_u = True
+            elif any(kw in t_n for kw in ["乡", "镇", "林场", "农场"]): is_u = False
+            else: is_u = "区" in a_data['name'] or "市" in a_data['name']
+        else:
+            is_u = "区" in a_data['name'] or "街道" in a_data['name']
+
+        # Town-level villages logic
+        v_list = villages.get(t_c, []) if t_c else []
+        if is_u:
+            b_estate = ""
+            if v_list:
+                u_vp = [v for v in v_list if any(kw in v for kw in ["社区", "居委会"])]
+                if not u_vp: u_vp = v_list
+                b_estate = self.random_element(u_vp)
+                for s in ["居民委员会", "社区居委会", "居委会", "社区", "村民委员会", "村委会"]:
+                    b_estate = b_estate.replace(s, "")
+            if not b_estate or len(b_estate) < 2:
+                b_estate = self.random_element(["阳光", "时代", "世纪", "国际", "理想", "中心", "滨江", "华府", "万科", "金地"])
+            e_suffix = self.random_element(["小区", "花园", "苑", "家园", "新村", "府"])
+            e_name = f"{b_estate}{e_suffix}"
+            r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华"]) + self.random_element(["路", "街"])
+            full_street = f"{t_n}{r_name}{e_name}{self.random_int(1,50)}号楼{self.random_int(1,5)}单元{self.random_int(1,30)}0{self.random_int(1,4)}室"
+        else:
+            v_name = ""
+            if v_list:
+                r_vp = [v.replace("村民委员会", "").replace("村委会", "").replace("居委会", "") for v in v_list]
+                v_name = self.random_element(r_vp)
+                if v_name and not any(v_name.endswith(s) for s in ["村", "庄", "队"]): v_name += "村"
+            if not v_name:
+                v_name = f"{self.random_element(['张家', '李家', '王家', '赵家', '大', '小', '新'])}{self.random_element(['村', '庄', '屯'])}"
+                if not v_name.endswith("村"): v_name += "村"
+            full_street = f"{t_n}{v_name}{self.random_int(1,100)}号"
+
+        # Vehicle Plate prefix mapping
+        plate_prefixes = {
+            "北京": "京", "天津": "津", "上海": "沪", "重庆": "渝", "河北": "冀",
+            "山西": "晋", "辽宁": "辽", "吉林": "吉", "黑龙江": "黑", "江苏": "苏",
+            "浙江": "浙", "安徽": "皖", "福建": "闽", "江西": "赣", "山东": "鲁",
+            "河南": "豫", "湖北": "鄂", "湖南": "湘", "广东": "粤", "海南": "琼",
+            "四川": "川", "贵州": "贵", "云南": "云", "陕西": "陕", "甘肃": "甘",
+            "青海": "青", "台湾": "台", "内蒙古": "蒙", "广西": "桂", "西藏": "藏",
+            "宁夏": "宁", "新疆": "新", "香港": "港", "澳门": "澳"
+        }
+        
+        plate_prefix = "京"
+        for k, v in plate_prefixes.items():
+            if k in p_data['name']:
+                plate_prefix = v
+                break
+        
+        # Simple random city letter (A-Z except I and O usually)
+        city_letter = self.random_element("ABCDEFGHJKLMNPQRSTUVWXYZ")
+
+        return {
+            "province": p_data['name'],
+            "city": c_data['name'],
+            "area": a_data['name'],
+            "town": t_n,
+            "is_urban": is_u,
+            "address": f"{p_data['name']}{c_data['name']}{a_data['name']}{full_street}",
+            "plate_prefix": f"{plate_prefix}{city_letter}"
+        }
+
+
     def persona(
         self,
         gender: Optional[str] = None,
@@ -202,87 +280,11 @@ class PersonaProvider(BaseProvider):
         checksum = self._ssn_checksum(ssn_17)
         ssn = f"{ssn_17}{checksum}"
 
-        # 4. Define Address Generation Logic (Internal to support separation)
-        def generate_full_address(p_data, c_data, a_data, f_urban=False):
-            t_list = a_data.get('children', [])
-            if f_urban and t_list:
-                urban_t = [t for t in t_list if any(kw in t['name'] for kw in ["街道", "地区", "开发区"])]
-                if urban_t: t_list = urban_t
-
-            if not t_list:
-                t_n, t_c = "", ""
-            else:
-                t_obj = self.random_element(t_list)
-                t_n, t_c = t_obj['name'], t_obj.get('code', '')
-
-            is_u = False
-            if t_n:
-                if any(kw in t_n for kw in ["街道", "地区", "社区", "开发区"]): is_u = True
-                elif any(kw in t_n for kw in ["乡", "镇", "林场", "农场"]): is_u = False
-                else: is_u = "区" in a_data['name'] or "市" in a_data['name']
-            else:
-                is_u = "区" in a_data['name'] or "街道" in a_data['name']
-
-            # Town-level villages logic
-            v_list = villages.get(t_c, []) if t_c else []
-            if is_u:
-                b_estate = ""
-                if v_list:
-                    u_vp = [v for v in v_list if any(kw in v for kw in ["社区", "居委会"])]
-                    if not u_vp: u_vp = v_list
-                    b_estate = self.random_element(u_vp)
-                    for s in ["居民委员会", "社区居委会", "居委会", "社区", "村民委员会", "村委会"]:
-                        b_estate = b_estate.replace(s, "")
-                if not b_estate or len(b_estate) < 2:
-                    b_estate = self.random_element(["阳光", "时代", "世纪", "国际", "理想", "中心", "滨江", "华府", "万科", "金地"])
-                e_suffix = self.random_element(["小区", "花园", "苑", "家园", "新村", "府"])
-                e_name = f"{b_estate}{e_suffix}"
-                r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华"]) + self.random_element(["路", "街"])
-                full_street = f"{t_n}{r_name}{e_name}{self.random_int(1,50)}号楼{self.random_int(1,5)}单元{self.random_int(1,30)}0{self.random_int(1,4)}室"
-            else:
-                v_name = ""
-                if v_list:
-                    r_vp = [v.replace("村民委员会", "").replace("村委会", "").replace("居委会", "") for v in v_list]
-                    v_name = self.random_element(r_vp)
-                    if v_name and not any(v_name.endswith(s) for s in ["村", "庄", "队"]): v_name += "村"
-                if not v_name:
-                    v_name = f"{self.random_element(['张家', '李家', '王家', '赵家', '大', '小', '新'])}{self.random_element(['村', '庄', '屯'])}"
-                    if not v_name.endswith("村"): v_name += "村"
-                full_street = f"{t_n}{v_name}{self.random_int(1,100)}号"
-
-            # Vehicle Plate prefix mapping
-            plate_prefixes = {
-                "北京": "京", "天津": "津", "上海": "沪", "重庆": "渝", "河北": "冀",
-                "山西": "晋", "辽宁": "辽", "吉林": "吉", "黑龙江": "黑", "江苏": "苏",
-                "浙江": "浙", "安徽": "皖", "福建": "闽", "江西": "赣", "山东": "鲁",
-                "河南": "豫", "湖北": "鄂", "湖南": "湘", "广东": "粤", "海南": "琼",
-                "四川": "川", "贵州": "贵", "云南": "云", "陕西": "陕", "甘肃": "甘",
-                "青海": "青", "台湾": "台", "内蒙古": "蒙", "广西": "桂", "西藏": "藏",
-                "宁夏": "宁", "新疆": "新", "香港": "港", "澳门": "澳"
-            }
-            
-            plate_prefix = "京"
-            for k, v in plate_prefixes.items():
-                if k in p_data['name']:
-                    plate_prefix = v
-                    break
-            
-            # Simple random city letter (A-Z except I and O usually)
-            city_letter = self.random_element("ABCDEFGHJKLMNPQRSTUVWXYZ")
-
-            return {
-                "province": p_data['name'],
-                "city": c_data['name'],
-                "area": a_data['name'],
-                "town": t_n,
-                "is_urban": is_u,
-                "address": f"{p_data['name']}{c_data['name']}{a_data['name']}{full_street}",
-                "plate_prefix": f"{plate_prefix}{city_letter}"
-            }
+        # 4. Address Logic extracted to class method
 
         # Generate Hometown
         villages = self._load_villages()
-        hometown_data = generate_full_address(prov_data, city_data, area_data)
+        hometown_data = self._generate_full_address(prov_data, city_data, area_data, villages)
 
         # 5. Resolve Social/Job constraints to determine Workplace
         job_val_pre = kwargs.get("job") or ""
@@ -303,79 +305,21 @@ class PersonaProvider(BaseProvider):
         else:
             wp_data, wc_data, wa_data = prov_data, city_data, area_data
 
-        workplace_data = generate_full_address(wp_data, wc_data, wa_data, f_urban=is_high_end)
+        workplace_data = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end)
 
         # 6. Generate Primary Phone based on Workplace
-        def get_phone_number(p_name: str, c_name: str) -> str:
-            p_key = p_name.replace("市", "").replace("省", "").replace("自治区", "")
-            matched_prov = next((k for k in phones.keys() if p_key in k or k in p_key), None)
-            if matched_prov:
-                city_dict = phones[matched_prov]
-                c_key = c_name.replace("市", "").replace("地区", "").replace("盟", "")
-                if p_key in ["北京", "上海", "天津", "重庆"] and c_key in ["辖区", "市辖区", "县"]:
-                    c_key = p_key
-                matched_city = next((k for k in city_dict.keys() if c_key in k or k in c_key), None)
-                if matched_city:
-                    prefixes = city_dict[matched_city]
-                    if prefixes:
-                        prefix = self.random_element(prefixes)
-                        suffix = f"{self.random_int(min=0, max=9999):04d}"
-                        return f"{prefix}{suffix}"
-            try: return self.generator.phone_number()
-            except AttributeError: return f"13{self.random_int(min=0,max=9)}{self.random_int(min=0,max=99999999):08d}"
 
         # 6. Generate Primary Phone based on Workplace
-        primary_phone = get_phone_number(str(workplace_data['province']), str(workplace_data['city']))
+        primary_phone = self._get_phone_number(phones, str(workplace_data['province']), str(workplace_data['city']))
 
         # 7. Determine Name (Gender already known) with Era-based Probabilities
-        def generate_era_name(birth_year, is_m):
-            # Dynamic weights instead of strict rules
-            traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛"]
-            traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴"]
-            modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航"]
-            modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵"]
-            mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞"]
-            mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹"]
-
-            r_val = random.random()
-            
-            # Base probability for generic faker name
-            generic_prob = 0.4
-            
-            if birth_year < 1970:
-                trad_prob = 0.5
-                mid_prob = 0.1
-            elif birth_year < 1990:
-                trad_prob = 0.1
-                mid_prob = 0.4
-            elif birth_year < 2010:
-                trad_prob = 0.05
-                mid_prob = 0.2
-            else: # 2010+
-                trad_prob = 0.02
-                mid_prob = 0.08
-                
-            modern_prob = 1.0 - generic_prob - trad_prob - mid_prob
-
-            if r_val < generic_prob:
-                 return getattr(self.generator, "name_male")() if is_m else getattr(self.generator, "name_female")()
-            elif r_val < generic_prob + trad_prob:
-                 name_char = self.random_element(traditional_m) if is_m else self.random_element(traditional_f)
-            elif r_val < generic_prob + trad_prob + mid_prob:
-                 name_char = self.random_element(mid_m) if is_m else self.random_element(mid_f)
-            else:
-                 name_char = self.random_element(modern_m) if is_m else self.random_element(modern_f)
-                 
-            # Extract a random surname from the builtin generator
-            full_name_stub = self.generator.name()
-            # Chinese surnames are mostly 1 character, occasionally 2
-            surname = full_name_stub[0] if len(full_name_stub) > 1 else self.random_element(["王", "李", "张", "刘", "陈"])
-            return f"{surname}{name_char}"
+# 
+# 
 
         if kwargs.get("name"):
             name = kwargs.get("name")
         else:
-            name = generate_era_name(birth_date.year, is_male)
+            name = self._generate_era_name(birth_date.year, is_male)
 
         # 8. Ethnicity and Identity (Geo-aware distribution)
         ethnicity = kwargs.get("ethnicity")
@@ -406,49 +350,10 @@ class PersonaProvider(BaseProvider):
         # Postcode Logic: Load Full Database
         full_pc_index = self._load_postcodes()
         
-        def generate_realistic_postcode(p_n, c_n, a_n):
-            # Precision candidates (Specific to General)
-            # Handle Municipality redundancy (e.g., Beijing Beijing)
-            clean_p = p_n.replace('省','').replace('市','').replace('自治区','')
-            clean_c = c_n.replace('市','').replace('地区','').replace('盟','')
-            
-            candidates = [
-                f"{p_n}{c_n}{a_n}",
-                f"{clean_p}{c_n}{a_n}",
-                f"{c_n}{a_n}",
-                a_n, # Direct County/District match (vulnerable to duplicate names, but usually fine in context)
-                f"{p_n}{c_n}",
-                p_n
-            ]
-            for cand in candidates:
-                if cand in full_pc_index:
-                    return full_pc_index[cand]
-            
-            # Fallback to prefix-based random generation if not in DB
-            prefix = "00"
-            postcode_map = {
-                "北京": "10", "上海": "20", "天津": "30", "重庆": "40",
-                "辽宁": "11", "吉林": "13", "黑龙江": "15", "江苏": "21",
-                "浙江": "31", "安徽": "23", "福建": "35", "内蒙古": "01",
-                "江西": "33", "山东": "25", "河南": "45", "湖北": "43",
-                "湖南": "41", "广东": "51", "广西": "53", "海南": "57",
-                "四川": "61", "贵州": "55", "云南": "65", "西藏": "85",
-                "陕西": "71", "甘肃": "73", "青海": "81", "宁夏": "75",
-                "新疆": "83", "河北": "05", "山西": "03"
-            }
-            for k, v in postcode_map.items():
-                if k in p_n:
-                    prefix = v
-                    break
-            return f"{prefix}{self.random_int(min=0, max=9999):04d}"
 
         # 8. Physical attributes with realistic distributions
         # Blood types in China: O~32%, A~28%, B~30%, AB~10%
         # Rh- is rare in China: ~0.3%
-        def get_realistic_blood():
-            bt = self.random_element(["O"] * 32 + ["A"] * 28 + ["B"] * 30 + ["AB"] * 10)
-            rh = "-" if random.random() < 0.003 else "+"
-            return f"{bt}{rh}"
 
         # 8. Physical attributes with realistic distributions (分段式生长曲线)
         # Pediatric Growth Curve (18.5 - 27 BMI for adults, specific for minors)
@@ -474,24 +379,12 @@ class PersonaProvider(BaseProvider):
             
         height = kwargs.get("height") or f"{h_val}cm"
         weight = kwargs.get("weight") or f"{w_val}kg"
-        blood_type = kwargs.get("blood_type") or get_realistic_blood()
+        blood_type = kwargs.get("blood_type") or self._get_realistic_blood()
 
         # Web / Account attributes (姓名-账号耦合)
         # Simple name-based username logic
-        def get_linked_identity(full_name: str):
-            # If name is '张三', try 'zhangsan', 'san.zhang', etc.
-            surname = full_name[0]
-            pinyin_prefix = self._pinyin_map.get(surname, "")
-            if pinyin_prefix:
-                variant = self.random_element([
-                    f"{pinyin_prefix}.{self.random_int(10, 999)}",
-                    f"{pinyin_prefix}{self.random_int(1980, 2010)}",
-                    f"{self.generator.user_name()[:3]}.{pinyin_prefix}"
-                ])
-                return variant
-            return self.generator.user_name()
 
-        username = kwargs.get("username") or get_linked_identity(name)
+        username = kwargs.get("username") or self._get_linked_identity(name)
         password = kwargs.get("password") or self.generator.password()
         guid = kwargs.get("guid") or str(self.generator.uuid4())
         
@@ -504,34 +397,6 @@ class PersonaProvider(BaseProvider):
         temp_domain = self.random_element(list(temp_mail_configs.keys()))
         temp_email = kwargs.get("temp_email") or f"{username}@{temp_domain}"
         # Dynamic Email Domain Weights based on Age and Job
-        def generate_weighted_email(un: str, a: int, job_title: str):
-            r = random.random()
-            
-            # Identify if the job requires/allows access to international services
-            is_tech_foreign = any(kw in job_title for kw in ["架构师", "程序员", "开发", "IT", "研究员", "科学家", "外贸", "外资"])
-            
-            if a < 25:
-                # Young/Student: High QQ tendency (approx 70%), some 163 (20%)
-                providers = [("qq.com", 0.70), ("163.com", 0.20), ("outlook.com", 0.08)]
-                if is_tech_foreign: providers.append(("gmail.com", 0.02))
-            elif a < 45:
-                # Working age: Mixed. QQ still popular but 163/126 rises.
-                providers = [("163.com", 0.40), ("qq.com", 0.35), ("126.com", 0.15), ("foxmail.com", 0.05), ("outlook.com", 0.05)]
-                if is_tech_foreign: providers.append(("gmail.com", 0.15)) # Tech workers 25-45 have higher Gmail chance
-            else:
-                # Older: 163, sina dominant
-                providers = [("163.com", 0.50), ("sina.com", 0.25), ("qq.com", 0.15), ("126.com", 0.08), ("hotmail.com", 0.02)]
-            
-            total = sum(w for p, w in providers)
-            rand_val = random.uniform(0, total)
-            upto = 0
-            chosen_domain = providers[0][0]
-            for p, w in providers:
-                if upto + w >= rand_val:
-                    chosen_domain = p
-                    break
-                upto += w
-            return f"{un}@{chosen_domain}"
 
         # Social / background with age constraints
         if age < 7:
@@ -559,19 +424,6 @@ class PersonaProvider(BaseProvider):
         education = kwargs.get("education") or self.random_element(education_opts)
         employment = kwargs.get("employment") or self.random_element(employment_opts)
 
-        def get_realistic_job():
-            rare_keywords = [
-                "星探", "经纪人", "体验师", "鉴定师", "潜水", "飞行", "演艺", "教练", 
-                "CEO", "总裁", "总经理", "总监", "首席", "外交", "基金经理", "操盘手", 
-                "架构师", "科学家", "研究员", "高级", "专家", "舰长"
-            ]
-            for _ in range(20):  # Prevent infinite loop
-                candidate = self.generator.job()
-                if not any(kw in candidate for kw in rare_keywords):
-                    return candidate
-                if random.random() < 0.02:  # 2% drop rate for rare jobs
-                    return candidate
-            return self.generator.job()
 
         # Job deduction based strictly on employment status
         if employment in ["在读", "全职学生"]:
@@ -581,7 +433,7 @@ class PersonaProvider(BaseProvider):
         elif employment == "退休":
             job_val = "退休人员"
         else:
-            job_val = get_realistic_job()
+            job_val = self._get_realistic_job()
 
         job = kwargs.get("job") or job_val
 
@@ -632,23 +484,13 @@ class PersonaProvider(BaseProvider):
         # Rural factor (based on workplace environment)
         rural_factor = random.uniform(0.6, 0.8) if not workplace_data.get('is_urban', True) else 1.0
 
-        def get_salary_by_job(job_name):
-            base_val = 8000
-            for keywords, range_vals in job_salary_mapping:
-                if any(kw in job_name for kw in keywords):
-                    base_val = self.random_int(min=range_vals[0], max=range_vals[1])
-                    break
-            
-            # Apply multipliers
-            final_val = float(base_val) * city_factor * rural_factor
-            return f"￥{int(final_val // 100 * 100)}"
 
         if "在读" in employment or "待业" in employment or job in ["无", "幼儿", "学生"]:
             salary = "￥0"
         else:
-            salary = kwargs.get("salary") or get_salary_by_job(job)
+            salary = kwargs.get("salary") or self._get_salary_by_job(job, job_salary_mapping, city_factor, rural_factor)
             
-        email = kwargs.get("email") or generate_weighted_email(username, age, job)
+        email = kwargs.get("email") or self._generate_weighted_email(username, age, job)
         
         yopmail_account = kwargs.get("yopmail") or f"{username}@yopmail.com"
         yopmail_url = f"https://yopmail.com/zh/?login={username}"
@@ -661,21 +503,6 @@ class PersonaProvider(BaseProvider):
         mbti = kwargs.get("mbti") or self.random_element(mbti_list)
 
         # Bank Card (Luhn standard)
-        def generate_luhn(prefix, length=19):
-            digits = [int(d) for d in str(prefix)]
-            while len(digits) < length - 1:
-                digits.append(self.random_int(0, 9))
-            
-            # Luhn calculation
-            checksum = 0
-            for i, d in enumerate(reversed(digits)):
-                if i % 2 == 0:
-                    d *= 2
-                    if d > 9: d -= 9
-                checksum += d
-            check_digit = (10 - (checksum % 10)) % 10
-            digits.append(check_digit)
-            return "".join(map(str, digits))
 
         bank_name = "无"
         bank_card = "无"
@@ -688,7 +515,7 @@ class PersonaProvider(BaseProvider):
             }
             bank_name = self.random_element(list(bank_bins.keys()))
             bin_val = self.random_element(bank_bins[bank_name])
-            bank_card = kwargs.get("bank_card") or generate_luhn(bin_val)
+            bank_card = kwargs.get("bank_card") or self._generate_luhn(bin_val)
             
         # Vehicle Plates based on realistic Chinese socio-economic statistics
         # Statistically, 1 in 4 people in China owns a car (approx 25%).
@@ -843,7 +670,8 @@ class PersonaProvider(BaseProvider):
                 "city": hometown_data['city'],
                 "area": hometown_data['area'],
                 "address": hometown_data['address'],
-                "postcode": generate_realistic_postcode(
+                "postcode": self._generate_realistic_postcode(
+                    full_pc_index,
                     hometown_data['province'], 
                     hometown_data['city'], 
                     hometown_data['area']
@@ -900,7 +728,7 @@ class PersonaProvider(BaseProvider):
             elif w_city in ["省直辖县级行政区划", "自治区直辖县级行政区划"]:
                 w_addr_city = ""
 
-            secondary_phone = get_phone_number(work_prov_name, w_city)
+            secondary_phone = self._get_phone_number(phones, work_prov_name, w_city)
             result["secondary_phone"] = {
                 "number": secondary_phone,
                 "location": f"{work_prov_name}{w_addr_city}" if w_addr_city else work_prov_name
@@ -931,3 +759,193 @@ class PersonaProvider(BaseProvider):
             return self._filter_by_fields(result, fields)
 
         return result
+
+    def _get_phone_number(self, phones, p_name: str, c_name: str):
+        p_key = p_name.replace("市", "").replace("省", "").replace("自治区", "")
+        matched_prov = next((k for k in phones.keys() if p_key in k or k in p_key), None)
+        if matched_prov:
+            city_dict = phones[matched_prov]
+            c_key = c_name.replace("市", "").replace("地区", "").replace("盟", "")
+            if p_key in ["北京", "上海", "天津", "重庆"] and c_key in ["辖区", "市辖区", "县"]:
+                c_key = p_key
+            matched_city = next((k for k in city_dict.keys() if c_key in k or k in c_key), None)
+            if matched_city:
+                prefixes = city_dict[matched_city]
+                if prefixes:
+                    prefix = self.random_element(prefixes)
+                    suffix = f"{self.random_int(min=0, max=9999):04d}"
+                    return f"{prefix}{suffix}"
+        try: return self.generator.phone_number()
+        except AttributeError: return f"13{self.random_int(min=0,max=9)}{self.random_int(min=0,max=99999999):08d}"
+
+    def _generate_era_name(self, birth_year, is_m):
+        # Dynamic weights instead of strict rules
+        traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛"]
+        traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴"]
+        modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航"]
+        modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵"]
+        mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞"]
+        mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹"]
+
+        r_val = random.random()
+        
+        # Base probability for generic faker name
+        generic_prob = 0.4
+        
+        if birth_year < 1970:
+            trad_prob = 0.5
+            mid_prob = 0.1
+        elif birth_year < 1990:
+            trad_prob = 0.1
+            mid_prob = 0.4
+        elif birth_year < 2010:
+            trad_prob = 0.05
+            mid_prob = 0.2
+        else: # 2010+
+            trad_prob = 0.02
+            mid_prob = 0.08
+            
+        modern_prob = 1.0 - generic_prob - trad_prob - mid_prob
+
+        if r_val < generic_prob:
+             return getattr(self.generator, "name_male")() if is_m else getattr(self.generator, "name_female")()
+        elif r_val < generic_prob + trad_prob:
+             name_char = self.random_element(traditional_m) if is_m else self.random_element(traditional_f)
+        elif r_val < generic_prob + trad_prob + mid_prob:
+             name_char = self.random_element(mid_m) if is_m else self.random_element(mid_f)
+        else:
+             name_char = self.random_element(modern_m) if is_m else self.random_element(modern_f)
+             
+        # Extract a random surname from the builtin generator
+        full_name_stub = self.generator.name()
+        # Chinese surnames are mostly 1 character, occasionally 2
+        surname = full_name_stub[0] if len(full_name_stub) > 1 else self.random_element(["王", "李", "张", "刘", "陈"])
+        return f"{surname}{name_char}"
+
+    def _generate_realistic_postcode(self, full_pc_index, p_n, c_n, a_n):
+        # Precision candidates (Specific to General)
+        # Handle Municipality redundancy (e.g., Beijing Beijing)
+        clean_p = p_n.replace('省','').replace('市','').replace('自治区','')
+        clean_c = c_n.replace('市','').replace('地区','').replace('盟','')
+        
+        candidates = [
+            f"{p_n}{c_n}{a_n}",
+            f"{clean_p}{c_n}{a_n}",
+            f"{c_n}{a_n}",
+            a_n, # Direct County/District match (vulnerable to duplicate names, but usually fine in context)
+            f"{p_n}{c_n}",
+            p_n
+        ]
+        for cand in candidates:
+            if cand in full_pc_index:
+                return full_pc_index[cand]
+        
+        # Fallback to prefix-based random generation if not in DB
+        prefix = "00"
+        postcode_map = {
+            "北京": "10", "上海": "20", "天津": "30", "重庆": "40",
+            "辽宁": "11", "吉林": "13", "黑龙江": "15", "江苏": "21",
+            "浙江": "31", "安徽": "23", "福建": "35", "内蒙古": "01",
+            "江西": "33", "山东": "25", "河南": "45", "湖北": "43",
+            "湖南": "41", "广东": "51", "广西": "53", "海南": "57",
+            "四川": "61", "贵州": "55", "云南": "65", "西藏": "85",
+            "陕西": "71", "甘肃": "73", "青海": "81", "宁夏": "75",
+            "新疆": "83", "河北": "05", "山西": "03"
+        }
+        for k, v in postcode_map.items():
+            if k in p_n:
+                prefix = v
+                break
+        return f"{prefix}{self.random_int(min=0, max=9999):04d}"
+
+    def _get_realistic_blood(self):
+        bt = self.random_element(["O"] * 32 + ["A"] * 28 + ["B"] * 30 + ["AB"] * 10)
+        rh = "-" if random.random() < 0.003 else "+"
+        return f"{bt}{rh}"
+
+    def _get_linked_identity(self, full_name: str):
+        # If name is '张三', try 'zhangsan', 'san.zhang', etc.
+        surname = full_name[0]
+        pinyin_prefix = self._pinyin_map.get(surname, "")
+        if pinyin_prefix:
+            variant = self.random_element([
+                f"{pinyin_prefix}.{self.random_int(10, 999)}",
+                f"{pinyin_prefix}{self.random_int(1980, 2010)}",
+                f"{self.generator.user_name()[:3]}.{pinyin_prefix}"
+            ])
+            return variant
+        return self.generator.user_name()
+
+    def _generate_weighted_email(self, un: str, a: int, job_title: str):
+        r = random.random()
+        
+        # Identify if the job requires/allows access to international services
+        is_tech_foreign = any(kw in job_title for kw in ["架构师", "程序员", "开发", "IT", "研究员", "科学家", "外贸", "外资"])
+        
+        if a < 25:
+            # Young/Student: High QQ tendency (approx 70%), some 163 (20%)
+            providers = [("qq.com", 0.70), ("163.com", 0.20), ("outlook.com", 0.08)]
+            if is_tech_foreign: providers.append(("gmail.com", 0.02))
+        elif a < 45:
+            # Working age: Mixed. QQ still popular but 163/126 rises.
+            providers = [("163.com", 0.40), ("qq.com", 0.35), ("126.com", 0.15), ("foxmail.com", 0.05), ("outlook.com", 0.05)]
+            if is_tech_foreign: providers.append(("gmail.com", 0.15)) # Tech workers 25-45 have higher Gmail chance
+        else:
+            # Older: 163, sina dominant
+            providers = [("163.com", 0.50), ("sina.com", 0.25), ("qq.com", 0.15), ("126.com", 0.08), ("hotmail.com", 0.02)]
+        
+        total = sum(w for p, w in providers)
+        rand_val = random.uniform(0, total)
+        upto = 0
+        chosen_domain = providers[0][0]
+        for p, w in providers:
+            if upto + w >= rand_val:
+                chosen_domain = p
+                break
+            upto += w
+        return f"{un}@{chosen_domain}"
+
+    def _get_realistic_job(self):
+        rare_keywords = [
+            "星探", "经纪人", "体验师", "鉴定师", "潜水", "飞行", "演艺", "教练", 
+            "CEO", "总裁", "总经理", "总监", "首席", "外交", "基金经理", "操盘手", 
+            "架构师", "科学家", "研究员", "高级", "专家", "舰长"
+        ]
+        for _ in range(20):  # Prevent infinite loop
+            candidate = self.generator.job()
+            if not any(kw in candidate for kw in rare_keywords):
+                return candidate
+            if random.random() < 0.02:  # 2% drop rate for rare jobs
+                return candidate
+        return self.generator.job()
+
+    def _get_salary_by_job(self, job_name, job_salary_mapping, city_factor, rural_factor):
+        base_val = 8000
+        for keywords, range_vals in job_salary_mapping:
+            if any(kw in job_name for kw in keywords):
+                base_val = self.random_int(min=range_vals[0], max=range_vals[1])
+                break
+        
+        # Apply multipliers
+        final_val = float(base_val) * city_factor * rural_factor
+        return f"￥{int(final_val // 100 * 100)}"
+
+    def _generate_luhn(self, prefix, length=19):
+        digits = [int(d) for d in str(prefix)]
+        while len(digits) < length - 1:
+            digits.append(self.random_int(0, 9))
+        
+        # Luhn calculation
+        checksum = 0
+        for i, d in enumerate(reversed(digits)):
+            if i % 2 == 0:
+                d *= 2
+                if d > 9: d -= 9
+            checksum += d
+        check_digit = (10 - (checksum % 10)) % 10
+        digits.append(check_digit)
+        return "".join(map(str, digits))
+
+class Provider(PersonaProvider):
+    pass
+

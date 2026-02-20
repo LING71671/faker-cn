@@ -162,7 +162,18 @@ cython_debug/
 # VS Code
 .vscode/
 
-# Local tests
+# Local tests and temporary files
 test_*.py
 test_*.txt
 tests/
+refactor*.py
+cleanup.py
+radon_score*.txt
+final_radon.txt
+nested_funcs_info.txt
+error.txt
+sdist_files.txt
+wheel_files.txt
+test_results.txt
+test_out.txt
+.gemini/
