@@ -16,7 +16,6 @@ def generate_ai_story(persona: Dict[str, Any], config: Dict[str, Any]) -> Option
     base_url = config.get("base_url", "https://api.deepseek.com/chat/completions")
     model = config.get("model", "deepseek-chat")
 
-    # Strict system prompt to avoid hallucinations
     system_prompt = (
         "你是一个极其严格的虚拟人物画像生成引擎的后台节点。请基于用户上传的核心设定字典（JSON形式），"
         "为该人物生成一段符合社会发展客观规律的人生经历/故事（不多于200字）。"
@@ -26,6 +25,8 @@ def generate_ai_story(persona: Dict[str, Any], config: Dict[str, Any]) -> Option
         "3. 户籍地必须和人生早期轨迹或籍贯吻合。如果有主手机号（primary_phone）和所在地，必须体现出他在该地生活过。"
         "如果有副手机号（secondary_phone）和工作地，必须让该地成为他人生的重要轨迹（如读大学或当前长期工作）。"
         "4. 从故事中提取一段稳定的 midjourney 可用的英文 Prompt，描述其外貌风格（符合年龄和职业，不带复杂背景）。"
+        "**极其重要**：英文 Prompt 必须明确要求这是一张**极其写实的真人类照片 (photorealistic, raw photo, highly detailed skin texture, 8k uhd, cinematic lighting)**，"
+        "是一张**正式的、免冠的、正面看向镜头的证件照 (formal ID photo, passport photo, frontal face, facing camera)**，并且**背景必须是纯蓝色 (solid blue background, exact hex color code #438EDB)**。"
         "5. 返回纯 JSON 格式（不带任何 markdown 标记如 ```json ），包含且仅包含两个字段：'life_story' (字符串), 'image_prompt' (字符串)。"
     )
 
@@ -72,7 +73,7 @@ def generate_ai_image(prompt: str, api_key: str) -> Optional[str]:
     payload = {
         "model": "black-forest-labs/FLUX.1-schnell",
         "prompt": prompt,
-        "image_size": "1024x1024"
+        "image_size": "768x1024"
     }
 
     try:

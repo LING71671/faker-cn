@@ -719,7 +719,7 @@ class PersonaProvider(BaseProvider):
                     plate_source = hometown_data
                 else:
                     # Pick a completely random Tier 1/2 province to simulate college/previous work
-                    edu_prov = self.random_element([p for p in areas if p['name'] in ["湖北", "江苏", "四川", "陕西", "广东", "山东", "辽宁"]])
+                    edu_prov = self.random_element([p for p in areas if any(name in p['name'] for name in ["湖北", "江苏", "四川", "陕西", "广东", "山东", "辽宁"])])
                     plate_source = {
                         "province": edu_prov['name'], 
                         "plate_prefix": edu_prov.get('children', [{'name': 'A'}])[0].get('name', 'A') # Fallback roughly
@@ -798,7 +798,14 @@ class PersonaProvider(BaseProvider):
             
         os_name = kwargs.get("os") or os_name
         ua = kwargs.get("user_agent") or ua
-        web_home = kwargs.get("web_home") or self.generator.url()
+        
+        # Only computer industry workers get a personal web home domain
+        is_tech = any(kw in job for kw in ["架构师", "程序员", "开发", "IT", "互联网", "软件", "系统", "算法", "后端", "前端", "网络"])
+        if is_tech:
+            web_home_domain = self.random_element(["github.io", "me", "com", "net", "org", "io"])
+            web_home = kwargs.get("web_home") or f"https://{username}.{web_home_domain}"
+        else:
+            web_home = kwargs.get("web_home") or "无"
 
         # Contextual Security Question/Answer
         sec_pairs = [

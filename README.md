@@ -19,9 +19,13 @@
 3. **特化的国内网络足迹 (Digital Footprint Dynamics)**
    - **分层的主力邮箱**：年轻人（<25岁）大量分配 `@qq.com`；中年及职场人多为 `@163.com`。
    - **拒绝盲目的 Gmail**：只有“程序员、高管、外贸、科学家”等涉外强相关职业，才有几率生成 `gmail.com`。
-   - **专属 Yopmail 临时邮箱**：为满足开发者自动化测试需要，**每个人物都会必定携带一个 `yopmail` 邮箱地址及一键直达收件箱的链接 (`yopmail_url`)**。
-   - **基于画像的设备拟合**：根据生成的职业角色与收入特征动态分配设备类型。例如特定岗位的管理或专业技术人员分配 macOS 或 iOS 17 的概率有所提升；而在宏观随机概率上，则覆盖分布最广泛的 Windows 10 与 Android 14 机型。
-4. **硬核的底层规则校验**
+   - **逻辑自洽的个人主页 (WebHome)**：不再盲目生成 URL。**只有计算机/互联网相关从业者**（程序员、架构师等）才会分配个人主页（如 `github.io` 或 `.me`），且域名与用户名严格锁定。其余行业人员默认为“无”。
+   - **专属 Yopmail 临时邮箱**：每个人物都会携带一个 `yopmail` 邮箱及一键直达链接 (`yopmail_url`)。
+   - **基于画像的设备拟合**：根据收入动态分配设备。高层管理分配 macOS/iOS 概率更高，普通岗位则覆盖 Windows 11 与 Android 14。
+4. **AI 赋能：人生轨迹与超写实证件照 (AI-Powered Stories & Realism Photos)**
+   - **自动化人生长卷**：接入人工智能（DeepSeek/OpenAI 等），根据字段自动编写逻辑自洽的人物生平。
+   - **超写实 3:4 蓝底证件照**：通过生图引擎生成**符合 3:4 比例**、**极其写实（真人类质感）**的正面免冠蓝底证件照（色码：`#438EDB`）。
+5. **硬核的底层规则校验**
    - **完美的身份证生成**：18位全准，严格 GB11643-1999 校验码算法（Mod 11-2），前 6 位与生成的出生地**分毫不差**。
    - 带有内置的高准度中国行政区划字典。
 
@@ -69,7 +73,23 @@ print(f"他的车牌号是: {person['asset']['vehicle_plate']}")
 print(f"他有 {person['asset']['deposit']} 存款")
 ```
 
-### 场景二：我想定制特定的人设（按需生成）
+### 场景二：我想接入人工智能 (人生轨迹+证件照)
+如果你填入了 AI 的 API 密钥，`faker-cn` 将摇身一变为“赛博造物主”，为你补充照片和生平。
+
+```python
+# 传入您的 AI keys
+ai_config = {
+    "api_key": "您的_DeepSeek_密钥",
+    "image_api_key": "您的_SiliconFlow_密钥" # 用于生成蓝底证件照
+}
+
+person = fake.persona(use_ai=True, ai_config=ai_config)
+
+print(f"人生经历: {person['life_story']}")
+print(f"证件照 URL: {person['avatar_url']}")
+```
+
+### 场景三：我想定制特定的人设（按需生成）
 比如，你正在测试一个只针对年轻女性高端用户的系统功能，你可以这样写：
 
 ```python
@@ -113,6 +133,8 @@ print(mini_person)
 | 主字段 (Root Key) | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `name` | String | 姓名（附带时代感概率分布） |
+| `life_story` | String | **(AI 特有)** 自动生成的人生轨迹故事 |
+| `avatar_url` | String | **(AI 特有)** 自动生成的 AI 蓝底证件照 URL |
 | `gender` | String | 性别（男/女） |
 | `age` | Int | 年龄 |
 | `birth_date` | String | 出生年月日（YYYY-MM-DD，跟身份证完全吻合） |
@@ -120,6 +142,7 @@ print(mini_person)
 | `email` | String | 常规主邮箱（年轻人偏 QQ，高阶偏 Gmail/163） |
 | `yopmail` / `yopmail_url` | String | **神器**：必定生成的一个 Yopmail 邮箱及一键直达浏览器的收看链接 |
 | `username` / `password` | String | 用户名与密码 |
+| `web_home` | String | **逻辑分配**：仅限 IT 行业人员的个人主页 URL，其余人员为“无” |
 | `os` / `user_agent` | String | 随工资浮动的电脑/手机设备系统与 UA |
 | `hometown` | Dict | **户籍信息** (包含 `province`, `city`, `district`, `postcode` 以及原生地坐标 `geo`) |
 | `primary_phone` | Dict | **主手机号** (归属地严格绑定 `hometown` 相同) |
