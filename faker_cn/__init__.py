@@ -260,8 +260,15 @@ class PersonaProvider(BaseProvider):
                 if c_name not in suffix and suffix not in c_name: b_estate = f"{c_name}{suffix}"
                 else: b_estate = suffix
                 r_name = self.random_element(["高新", "科技", "创业", "创新", "软件", "信息", "数据", "云", "智能", "智慧", "数字", "网络", "创客", "软件园", "科创", "科技园", "高新区", "开发区"]) + self.random_element(["路", "街", "大道"])
-                if self.random_int(0, 1) > 0: full_street = f"{t_n}{r_name}{self.random_int(1,500)}号{b_estate}{self.random_int(1,50)}层"
-                else: full_street = f"{t_n}{b_estate}{self.random_int(1,60)}楼{self.random_int(1,30)}0{self.random_int(1,9)}室"
+                
+                # Prevent absurd CBD buildings from appearing in pure rural towns/villages
+                # We only allow "村" in high-end office addresses if it's explicitly a "街道" (like 中关村街道) or we override the town name
+                final_t_n = t_n
+                if "村" in final_t_n and "街道" not in final_t_n:
+                    final_t_n = self.random_element(["高新街道", "科技园管理区", "经济开发区", "长河街道", "软件园街道", "中心城区"])
+
+                if self.random_int(0, 1) > 0: full_street = f"{final_t_n}{r_name}{self.random_int(1,500)}号{b_estate}{self.random_int(1,50)}层"
+                else: full_street = f"{final_t_n}{b_estate}{self.random_int(1,60)}楼{self.random_int(1,30)}0{self.random_int(1,9)}室"
             elif any(kw in job_v for kw in ["司机", "快递", "外卖", "配送", "厨师", "服务员", "营业员", "保安", "保洁", "家政", "保姆", "销售", "业务", "店员", "前台", "客服", "收银"]):
                 # Distinguish a bit between pure sales and food service
                 if "销售" in job_v or "业务" in job_v:
@@ -556,6 +563,11 @@ class PersonaProvider(BaseProvider):
             job_val = self._get_realistic_job()
 
         job = kwargs.get("job") or job_val
+        
+        # Logic Hardening: Age vs Title
+        elite_kw = ["总监", "CEO", "CTO", "CFO", "总裁", "总经理", "副总", "行长", "首席", "科学家", "专家", "研究员", "架构师", "法官"]
+        while age < 28 and any(kw in job for kw in elite_kw) and not kwargs.get("job"):
+            job = self._get_realistic_job()
 
         # Logic Hardening: Education Ceiling for Blue-Collar / Service
         blue_collar_kw = ["普工", "操作", "车间", "流水线", "装配", "纺织", "细纱", "包装", "厨师", "服务员", "营业员", "保安", "保洁", "家政", "保姆", "洗碗", "店员", "前台", "收银", "司机", "快递", "外卖", "配送", "理发", "美容", "美发", "美体", "泥瓦工", "钢筋工", "搬运", "清洁", "维修", "机修", "钳工", "焊工", "木工", "电工", "水管工", "修理", "足疗", "推拿", "按摩", "传菜", "门卫", "导购", "促销", "保洁", "钟点工", "月嫂", "保安", "后厨", "切配", "迎宾", "收银", "杂工", "收发", "工人", "混凝土", "挖掘机", "砌筑", "抹灰", "水电工", "架子工", "电梯工", "钣金", "喷漆", "锅炉", "保安", "保洁", "环卫", "绿化", "搬运", "装卸", "分拣"]
@@ -565,14 +577,6 @@ class PersonaProvider(BaseProvider):
             elif education == "本科" and self.random_int(1, 100) > 10:  # 90% chance to downgrade Bachelors in these roles
                 education = self.random_element(["初中", "高中", "中专", "大专", "职业技能培训"])
                 
-        # Logic Hardening: Base Education Age Floor
-        if education == "博士" and age < 27:
-            age = self.random_int(27, 45)
-        elif education in ["硕士", "MBA"] and age < 24:
-            age = self.random_int(24, 40)
-        elif education == "本科" and age < 22:
-            age = self.random_int(22, 35)
-            
         # Logic Hardening: Education/Age Door for Specific Jobs
         # Always fix '研究生' to be realistic
         if "研究生" in job:
@@ -582,8 +586,7 @@ class PersonaProvider(BaseProvider):
             education = "本科"
         
         # Specific high-end jobs require older age and higher education
-        if any(kw in job for kw in ["总", "CEO", "总裁", "主任", "总监", "经理"]):
-            if age < 25: age = self.random_int(26, 45)
+        if any(kw in job for kw in ["总", "CEO", "CFO", "CTO", "总裁", "主任", "总监", "经理", "行长", "店长", "厂长"]):
             if education in ["幼儿", "小学", "初中", "高中", "中专", "大专", "职业技能培训"]: 
                 education = self.random_element(["本科", "硕士", "MBA"])
                 
@@ -592,12 +595,31 @@ class PersonaProvider(BaseProvider):
             if education in ["幼儿", "小学", "初中", "高中", "中专", "大专", "职业技能培训"]:
                 education = self.random_element(["本科", "硕士", "博士"])
                 
-        if any(kw in job for kw in ["工程师", "开发", "程序员"]):
+        if any(kw in job for kw in ["医生", "医师", "法医", "法官", "检察"]):
+            if age < 24: age = self.random_int(25, 45)
+            if education in ["幼儿", "小学", "初中", "高中", "中专", "职业技能培训", "大专"]:
+                education = self.random_element(["本科", "硕士", "博士"])
+                
+        if any(kw in job for kw in ["工程师", "开发", "程序员", "律师"]):
             if age < 22: age = self.random_int(22, 40)
-            if education in ["幼儿", "小学", "初中"]:
+            if education in ["幼儿", "小学", "初中", "高中", "中专"]:
                 education = self.random_element(["大专", "本科"])
 
-
+        # Final Logic Hardening: Immutable Base Education Age Floor
+        # Authentic Chinese schooling path:
+        # College entrance usually at 18
+        # Bachelor (本科) = 4 years -> age >= 22
+        # Associate (大专) = 3 years -> age >= 21
+        # Master (硕士) = 2-3 years -> age >= 24 (or 25)
+        # Doctor (博士) = 3-4 years -> age >= 27 (or 28)
+        if education == "博士" and age < 28:
+            education = self.random_element(["大专", "本科", "硕士"])
+        if education in ["硕士", "MBA"] and age < 24:
+            education = self.random_element(["大专", "本科"])
+        if education == "本科" and age < 22:
+            education = self.random_element(["高中", "中专", "大专"])
+        if education == "大专" and age < 21:
+            education = self.random_element(["高中", "中专"])
 
         # 5. Resolve Social/Job constraints to determine Workplace
         company_name = "无"
@@ -843,6 +865,14 @@ class PersonaProvider(BaseProvider):
             salary = "￥0"
         else:
             salary = kwargs.get("salary") or self._get_salary_by_job(job, job_salary_mapping, city_factor, rural_factor)
+            # Logic Hardening: Age-based Salary Dampener
+            if salary != "￥0" and not kwargs.get("salary"):
+                sal_val = float(salary.replace("￥", "").replace(",", ""))
+                if age < 25 and sal_val > 15000:
+                    sal_val *= random.uniform(0.4, 0.6)
+                elif age < 28 and sal_val > 30000:
+                    sal_val *= random.uniform(0.5, 0.7)
+                salary = f"￥{int(sal_val // 100 * 100)}"
             
         email = kwargs.get("email") or self._generate_weighted_email(username, age, job)
         
@@ -883,7 +913,8 @@ class PersonaProvider(BaseProvider):
             elif final_salary > 15000: car_prob = 0.65
             elif final_salary > 8000: car_prob = 0.35
             elif final_salary > 5000: car_prob = 0.10
-            else: car_prob = 0.01
+            elif final_salary > 0: car_prob = 0.01
+            else: car_prob = 0.00
             
             # Slightly reduce probability in Tier 1 cities due to license plate lottery/restrictions
             if any(t1 in str(workplace_data.get('city', '')) for t1 in ["北京", "上海", "广州", "深圳"]):
@@ -988,7 +1019,7 @@ class PersonaProvider(BaseProvider):
         ua = kwargs.get("user_agent") or ua
         
         # Only computer industry workers get a personal web home domain
-        is_tech = any(kw in job for kw in ["架构师", "程序员", "开发", "IT", "互联网", "软件", "系统", "算法", "后端", "前端", "网络"])
+        is_tech = any(kw in job for kw in ["架构师", "程序员", "开发", "IT", "软件工程", "测试", "算法", "后端", "前端", "网络工程", "网络安全", "运维", "数据"])
         if is_tech:
             web_home_domain = self.random_element(["github.io", "me", "com", "net", "org", "io"])
             web_home = kwargs.get("web_home") or f"https://{username}.{web_home_domain}"
