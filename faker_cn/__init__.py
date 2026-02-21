@@ -122,24 +122,29 @@ class PersonaProvider(BaseProvider):
         return start + timedelta(days=random_days)
 
     def _generate_full_address(self, p_data, c_data, a_data, villages, f_urban=False, job=None, employment=None):
+        # 7th Census: Urban vs Rural
+        # Target: Urban 63.89%, Rural 36.11%
+        is_u = random.random() < 0.6389
+        if f_urban: is_u = True
+        
         t_list = a_data.get('children', [])
-        if f_urban and t_list:
-            urban_t = [t for t in t_list if any(kw in t['name'] for kw in ["街道", "地区", "开发区"])]
-            if urban_t: t_list = urban_t
-
+        
+        urban_t = []
+        rural_t = []
+        if t_list:
+            urban_t = [t for t in t_list if any(kw in t['name'] for kw in ["街道", "区", "镇", "开发区"])]
+            rural_t = [t for t in t_list if any(kw in t['name'] for kw in ["乡", "村", "林场", "农场"])]
+            
+            if is_u and urban_t:
+                t_list = urban_t
+            elif not is_u and rural_t:
+                t_list = rural_t
+                
         if not t_list:
             t_n, t_c = "", ""
         else:
             t_obj = self.random_element(t_list)
             t_n, t_c = t_obj['name'], t_obj.get('code', '')
-
-        is_u = False
-        if t_n:
-            if any(kw in t_n for kw in ["街道", "地区", "社区", "开发区"]): is_u = True
-            elif any(kw in t_n for kw in ["乡", "镇", "林场", "农场"]): is_u = False
-            else: is_u = "区" in a_data['name'] or "市" in a_data['name']
-        else:
-            is_u = "区" in a_data['name'] or "街道" in a_data['name']
 
         # Town-level villages logic
         v_list = villages.get(t_c, []) if t_c else []
@@ -297,8 +302,24 @@ class PersonaProvider(BaseProvider):
             filtered = [p for p in prov_list if hometown_province in p['name']]
             if filtered:
                 prov_list = filtered
-
-        prov_data = self.random_element(prov_list)
+                prov_data = self.random_element(prov_list)
+            else:
+                prov_data = self.random_element(prov_list)
+        else:
+            # 7th Census: Province Population Weighting
+            prov_weights_dict = {
+                "广东": 8.93, "山东": 7.19, "河南": 7.04, "江苏": 6.00, "四川": 5.93,
+                "河北": 5.28, "湖南": 4.71, "浙江": 4.57, "安徽": 4.32, "湖北": 4.09,
+                "广西": 3.55, "云南": 3.34, "江西": 3.20, "辽宁": 3.02, "福建": 2.94,
+                "陕西": 2.80, "贵州": 2.73, "新疆": 1.83, "甘肃": 1.77, "上海": 1.76,
+                "吉林": 1.71, "内蒙古": 1.70, "北京": 1.55, "重庆": 2.27, "黑龙江": 2.26,
+                "山西": 2.47, "天津": 0.98, "海南": 0.71, "宁夏": 0.51, "青海": 0.42,
+                "西藏": 0.26
+            }
+            # Fallback weight for missing provinces
+            w_list = [prov_weights_dict.get(p['name'].replace("省", "").replace("市", "").replace("自治区", "").replace("壮族", "").replace("回族", "").replace("维吾尔", ""), 1.0) for p in prov_list]
+            prov_data = random.choices(prov_list, weights=w_list, k=1)[0]
+            
         prov_name = prov_data['name']
 
         city_list = prov_data.get('children', [])
@@ -330,19 +351,42 @@ class PersonaProvider(BaseProvider):
             town_name = ""
             town_code = ""
 
-        # 2. Resolve Gender and Age
+        # 2. Resolve Gender, Age and Marital Status
         if gender not in ['男', '女', 'M', 'F']:
-            gender_val = self.random_element(['男', '女'])
+            # 7th Census: General Sex Ratio 105.07 (Male 51.24%, Female 48.76%)
+            gender_val = random.choices(['男', '女'], weights=[51.24, 48.76], k=1)[0]
         else:
             gender_val = '男' if gender in ['男', 'M'] else '女'
 
         is_male = gender_val == '男'
 
         if not age_range or len(age_range) != 2:
-            age_range = (18, 65)
+            # 7th Census: Age Pyramid -> 0-14: 17.95%, 15-59: 63.35%, 60+: 18.70%
+            age_bucket = random.choices(["0-14", "15-59", "60-90"], weights=[17.95, 63.35, 18.70], k=1)[0]
+            if age_bucket == "0-14":
+                age_range = (1, 14)
+            elif age_bucket == "15-59":
+                age_range = (15, 59)
+            else:
+                age_range = (60, 90)
 
         birth_date = self._random_date_between(age_range[0], age_range[1])
         age = date.today().year - birth_date.year - ((date.today().month, date.today().day) < (birth_date.month, birth_date.day))
+
+        # Infer Marital Status based on Age Profile
+        if age < 22:
+            marital_status = "未婚"
+        elif age < 30:
+            # ~60% un-married, ~39% married, ~1% divorced
+            marital_status = random.choices(["未婚", "已婚", "离异"], weights=[60, 39, 1], k=1)[0]
+        elif age < 50:
+            # High marriage rate, some divorce
+            marital_status = random.choices(["未婚", "已婚", "离异", "丧偶"], weights=[15, 75, 9, 1], k=1)[0]
+        else:
+            # Older cohorts
+            marital_status = random.choices(["未婚", "已婚", "离异", "丧偶"], weights=[5, 75, 5, 15], k=1)[0]
+        
+        marital_status = kwargs.get("marital_status") or marital_status
 
         # 3. Generate SSN
         date_str = birth_date.strftime('%Y%m%d')
@@ -848,6 +892,7 @@ class PersonaProvider(BaseProvider):
                 "employment": employment,
                 "job": job,
                 "salary": salary,
+                "marital_status": marital_status,
                 "security_question": sec_q,
                 "security_answer": sec_a
             },
