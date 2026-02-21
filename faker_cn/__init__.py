@@ -121,7 +121,7 @@ class PersonaProvider(BaseProvider):
         random_days = self.random_int(min=0, max=delta.days)
         return start + timedelta(days=random_days)
 
-    def _generate_full_address(self, p_data, c_data, a_data, villages, f_urban=False):
+    def _generate_full_address(self, p_data, c_data, a_data, villages, f_urban=False, job=None, employment=None):
         t_list = a_data.get('children', [])
         if f_urban and t_list:
             urban_t = [t for t in t_list if any(kw in t['name'] for kw in ["街道", "地区", "开发区"])]
@@ -143,30 +143,100 @@ class PersonaProvider(BaseProvider):
 
         # Town-level villages logic
         v_list = villages.get(t_c, []) if t_c else []
-        if is_u:
-            b_estate = ""
-            if v_list:
-                u_vp = [v for v in v_list if any(kw in v for kw in ["社区", "居委会"])]
-                if not u_vp: u_vp = v_list
-                b_estate = self.random_element(u_vp)
-                for s in ["居民委员会", "社区居委会", "居委会", "社区", "村民委员会", "村委会"]:
-                    b_estate = b_estate.replace(s, "")
-            if not b_estate or len(b_estate) < 2:
-                b_estate = self.random_element(["阳光", "时代", "世纪", "国际", "理想", "中心", "滨江", "华府", "万科", "金地"])
-            e_suffix = self.random_element(["小区", "花园", "苑", "家园", "新村", "府"])
-            e_name = f"{b_estate}{e_suffix}"
-            r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华"]) + self.random_element(["路", "街"])
-            full_street = f"{t_n}{r_name}{e_name}{self.random_int(1,50)}号楼{self.random_int(1,5)}单元{self.random_int(1,30)}0{self.random_int(1,4)}室"
+        if job is not None:
+            # Generate Workplace specific address
+            job_v = str(job)
+            if any(kw in job_v for kw in ["总", "高管", "CEO", "CTO", "CFO", "总裁", "主任", "架构师", "专家", "研究员", "科学家", "开发", "程序员", "IT", "互联网", "软件", "系统"]):
+                suffix = self.random_element(["大厦", "国际中心", "科技园", "广场", "中心", "软件园", "CBD", "创新中心"])
+                c_name = self.random_element(["星河", "腾讯", "阿里", "百度", "字节", "华为", "小米", "美团", "京东", "网易", "新浪", "天猫", "搜狐", "360", "金山", "滴滴", "平安", "万达", "绿地", "保利", "恒大", "融创", "富力", "华润", "中海", "招商", "万科", "金地", "龙湖", "绿城", "世茂", "新城", "阳光城", "佳兆业", "中南", "阳光", "时代", "世纪", "国际", "理想", "滨江", "华府", "环球", "财富", "金融", "世贸", "国贸"])
+                if c_name not in suffix and suffix not in c_name: b_estate = f"{c_name}{suffix}"
+                else: b_estate = suffix
+                r_name = self.random_element(["高新", "科技", "创业", "创新", "软件", "信息", "数据", "云", "智能", "智慧", "数字", "网络", "创客", "软件园", "科创", "科技园", "高新区", "开发区"]) + self.random_element(["路", "街", "大道"])
+                if self.random_int(0, 1) > 0: full_street = f"{t_n}{r_name}{self.random_int(1,500)}号{b_estate}{self.random_int(1,50)}层"
+                else: full_street = f"{t_n}{b_estate}{self.random_int(1,60)}楼{self.random_int(1,30)}0{self.random_int(1,9)}室"
+            elif any(kw in job_v for kw in ["司机", "快递", "外卖", "配送", "厨师", "服务员", "营业员", "保安", "保洁", "家政", "保姆", "销售", "业务", "店员", "前台", "客服", "收银"]):
+                # Distinguish a bit between pure sales and food service
+                if "销售" in job_v or "业务" in job_v:
+                    suffix = self.random_element(["服务中心", "大卖场", "专卖店", "门店", "营业厅", "门店", "广场", "时代广场"])
+                else:
+                    suffix = self.random_element(["商业街", "步行街", "购物中心", "百货", "广场", "商场", "超市", "连锁店", "餐饮", "酒店", "宾馆", "饭店", "餐馆", "快餐", "小吃", "面馆"])
+
+                if any(kw in suffix for kw in ["商业", "街", "广场", "中心", "商场"]):
+                    c_name = self.random_element(["万达", "大悦城", "万象城", "吾悦", "宝龙", "银泰", "印象城", "天街", "恒隆", "太古", "万科", "金鹰", "百联", "王府井", "茂业", "新百", "银座"])
+                else:
+                    c_name = self.random_element(["老王", "小李", "张记", "赵家", "刘阿姨", "王老板", "李师傅", "张大哥", "赵大姐", "陈大妈", "周村", "吴记", "郑家", "何氏", "好运", "发财", "吉祥", "如意", "平安", "顺发", "宏鼎", "鼎盛", "旺铺", "客家人", "老乡", "姐妹", "兄弟", "老地方", "相聚", "缘分", "天天", "开心"])
+                b_estate = f"{c_name}{suffix}"
+                r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华", "和平", "文化", "青年", "红星", "光明", "幸福", "团结", "前进", "东风", "红旗", "五一", "八一", "长安", "北京", "南京", "广州", "上海", "商业", "步行", "小吃", "美食", "女人", "古玩", "花鸟", "电子"]) + self.random_element(["路", "街", "巷", "弄", "道"])
+                full_street = f"{t_n}{r_name}{self.random_int(1,500)}号{b_estate}"
+            elif any(kw in job_v for kw in ["工人", "厂", "制造", "生产", "流水线", "车间", "装配", "普工", "质检", "维修", "机修", "电工", "焊工", "钳工"]):
+                suffix = self.random_element(["工业园", "制造厂", "加工厂", "机械厂", "服装厂", "电子厂", "塑料厂", "模具厂", "食品厂", "鞋厂", "玩具厂", "五金厂", "家具厂", "化工厂", "印刷厂", "纸箱厂", "包材厂", "纺织厂", "钢铁厂", "水泥厂", "砖厂"])
+                c_name = self.random_element(["富士康", "立讯", "比亚迪", "长城", "美的", "格力", "海尔", "海信", "TCL", "创维", "康佳", "长虹", "老板", "方太", "苏泊尔", "九阳", "华帝", "万和", "宏观", "格兰仕", "红牛", "康师傅", "统一", "娃哈哈", "农夫山泉"])
+                b_estate = f"{c_name}{suffix}"
+                r_name = self.random_element(["工业", "振兴", "创业", "发展", "腾飞", "开拓", "创新", "科技", "高新", "开发", "新村", "红星", "向阳", "东方", "迎宾", "世纪", "时代", "阳光", "星火", "火炬", "滨海", "沿海", "港口"]) + self.random_element(["路", "街", "大道", "园区", "二路", "三路"])
+                if self.random_int(0, 1) > 0: full_street = f"{t_n}{r_name}{self.random_int(1,500)}号{b_estate}{self.random_int(1,5)}车间"
+                else: full_street = f"{t_n}{b_estate}{self.random_int(1,10)}号厂房"
+            elif any(kw in job_v for kw in ["学校", "老师", "教授", "讲师", "教育", "培训"]):
+                suffix = self.random_element(["大学", "学院", "中学", "小学", "幼儿园", "培训中心", "教育机构", "重点高级中学", "职业技术学院"])
+                c_name = self.random_element(["第一", "第二", "第三", "第四", "第五", "实验", "外国语", "师范", "理工", "科技", "工商", "财经", "政法", "艺术", "体育", "医科", "农业", "林业", "联合", "交通", "星火"])
+                b_estate = f"{c_name}{suffix}"
+                r_name = self.random_element(["学院", "学府", "大学", "科教", "育才", "文化"]) + self.random_element(["路", "街"])
+                full_street = f"{t_n}{r_name}{self.random_int(1,200)}号{b_estate}"
+            elif any(kw in job_v for kw in ["医院", "医生", "护士", "医疗", "卫生", "保健"]):
+                suffix = self.random_element(["人民医院", "中心医院", "妇幼保健院", "中医院", "附属医院", "协和医院", "第一医院", "第二医院", "骨科医院", "眼科医院", "口腔医院", "卫生院", "社区卫生服务中心", "仁爱医院", "博爱医院", "康复医院"])
+                if "中心医院" in suffix or "卫生院" in suffix or "服务中心" in suffix: b_estate = f"{a_data['name']}{suffix}"
+                elif "社区" in suffix: b_estate = f"{t_n}{suffix}"
+                else: b_estate = f"{self.random_element(['市', '省', '区', '县', '军区', '铁路', '职工', '红十字', '协和', '同济', '华山', '中山', '瑞金', '湘雅', '齐鲁', '华西', '南方'])}{suffix}"
+                r_name = self.random_element(["健康", "康复", "白衣", "爱民", "天使", "人民", "红十字"]) + self.random_element(["路", "街"])
+                full_street = f"{t_n}{r_name}{self.random_int(1,200)}号{b_estate}"
+            else:
+                if employment == "自由职业":
+                    # Freelancers work at home, cafes, workspaces
+                    b_estate = self.random_element(["创客空间", "共享办公", "SOHO", "咖啡厅", "工作室", "公寓", "社区"])
+                    c_name = self.random_element(["星巴克", "瑞幸", "漫咖啡", "WeWork", "优客工场", "左岸", "时光", "理想", "阳光", "世纪"])
+                    if b_estate in ["工作室", "公寓", "社区"]:
+                        e_suffix = self.random_element(["小区", "花园", "苑", "家园", "新村"])
+                        b_estate = f"{self.random_element(['阳光', '时代', '世纪', '滨江', '华府'])}{e_suffix}"
+                    else:
+                        b_estate = f"{c_name}{b_estate}"
+                    r_name = self.random_element(["朝阳", "建设", "中山", "人民", "新华", "创业", "创新"]) + self.random_element(["路", "街"])
+                    full_street = f"{t_n}{r_name}{self.random_int(1,200)}号{b_estate}"
+                elif any(kw in job_v for kw in ["公务员", "行政", "局", "委", "办", "政府", "事业", "书记"]):
+                    b_estate = self.random_element(["人民政府", "教育局", "公安局", "税务局", "工商局", "建设局", "环保局", "文化局", "卫健委", "发改委", "民政局", "财政局", "居委会", "街道办事处", "派出所", "法院", "检察院", "交警大队", "消防大队"])
+                    if any(kw in b_estate for kw in ["局", "委", "政府", "处", "所", "院", "大队"]): b_estate = f"{c_data['name']}{a_data['name']}{b_estate}"
+                    r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华", "政法", "府前", "民主"]) + self.random_element(["路", "街", "大道"])
+                    full_street = f"{t_n}{r_name}{self.random_int(1,200)}号{b_estate}"
+                else:
+                    # General white-collar / commercial for unmatched jobs
+                    suffix = self.random_element(["大厦", "写字楼", "商务中心", "商办大楼", "大楼", "国贸"])
+                    c_name = self.random_element(["时代", "卓越", "绿城", "万象", "金融", "财富", "环球", "恒丰", "嘉里", "宝龙", "银泰", "万达"])
+                    b_estate = f"{c_name}{suffix}"
+                    r_name = self.random_element(["北京", "南京", "中山", "解放", "建国", "复兴", "和平", "新华", "人民"]) + self.random_element(["路", "街", "大道"])
+                    full_street = f"{t_n}{r_name}{self.random_int(1,200)}号{b_estate}{self.random_int(1,30)}层{self.random_int(1,20)}0{self.random_int(1,9)}室"
         else:
-            v_name = ""
-            if v_list:
-                r_vp = [v.replace("村民委员会", "").replace("村委会", "").replace("居委会", "") for v in v_list]
-                v_name = self.random_element(r_vp)
-                if v_name and not any(v_name.endswith(s) for s in ["村", "庄", "队"]): v_name += "村"
-            if not v_name:
-                v_name = f"{self.random_element(['张家', '李家', '王家', '赵家', '大', '小', '新'])}{self.random_element(['村', '庄', '屯'])}"
-                if not v_name.endswith("村"): v_name += "村"
-            full_street = f"{t_n}{v_name}{self.random_int(1,100)}号"
+            if is_u:
+                b_estate = ""
+                if v_list:
+                    u_vp = [v for v in v_list if any(kw in v for kw in ["社区", "居委会"])]
+                    if not u_vp: u_vp = v_list
+                    b_estate = self.random_element(u_vp)
+                    for s in ["居民委员会", "社区居委会", "居委会", "社区", "村民委员会", "村委会"]:
+                        b_estate = b_estate.replace(s, "")
+                if not b_estate or len(b_estate) < 2:
+                    b_estate = self.random_element(["阳光", "时代", "世纪", "国际", "理想", "中心", "滨江", "华府", "万科", "金地"])
+                e_suffix = self.random_element(["小区", "花园", "苑", "家园", "新村", "府"])
+                e_name = f"{b_estate}{e_suffix}"
+                r_name = self.random_element(["朝阳", "建设", "胜利", "解放", "中山", "人民", "新华"]) + self.random_element(["路", "街"])
+                full_street = f"{t_n}{r_name}{e_name}{self.random_int(1,50)}号楼{self.random_int(1,5)}单元{self.random_int(1,30)}0{self.random_int(1,4)}室"
+            else:
+                v_name = ""
+                if v_list:
+                    r_vp = [v.replace("村民委员会", "").replace("村委会", "").replace("居委会", "") for v in v_list]
+                    v_name = self.random_element(r_vp)
+                    if v_name and not any(v_name.endswith(s) for s in ["村", "庄", "队"]): v_name += "村"
+                if not v_name:
+                    v_name = f"{self.random_element(['张家', '李家', '王家', '赵家', '大', '小', '新'])}{self.random_element(['村', '庄', '屯'])}"
+                    if not v_name.endswith("村"): v_name += "村"
+                full_street = f"{t_n}{v_name}{self.random_int(1,100)}号"
 
         # Vehicle Plate prefix mapping
         plate_prefixes = {
@@ -289,26 +359,127 @@ class PersonaProvider(BaseProvider):
         villages = self._load_villages()
         hometown_data = self._generate_full_address(prov_data, city_data, area_data, villages)
 
-        # 5. Resolve Social/Job constraints to determine Workplace
-        job_val_pre = kwargs.get("job") or ""
-        is_high_end = any(kw in job_val_pre for kw in ["总", "CEO", "CTO", "高管", "总裁", "架构师", "专家"])
+        # Social / background with age constraints
+        if age < 7:
+            education = "幼儿"
+            employment = "在读"
+        elif age < 13:
+            education = "小学"
+            employment = "在读"
+        elif age < 16:
+            education = "初中"
+            employment = "在读"
+        elif age < 19:
+            education = random.choices(["高中", "中专"], weights=[60, 40], k=1)[0]
+            employment = "在读"
+        elif age < 23:
+            # College years: some are learning, some are working.
+            # Real world: highly weighted to Highschool/Vocational/Assosiates
+            education = random.choices(["初中", "高中", "中专", "职业技能培训", "大专", "本科"], weights=[10, 15, 10, 15, 30, 20], k=1)[0]
+            employment = random.choices(["在职", "待业", "在读"], weights=[40, 5, 55], k=1)[0]
+        elif age < 60:
+            # Core working population. Parity: Below Highschool ~50%, Highschool/Voc ~20%, Assoc 15%, Bach 12%, Mas/PhD 3%
+            edu_opts = ["初中", "高中", "中专", "职业技能培训", "大专", "本科", "硕士", "MBA", "博士"]
+            edu_weights = [50, 10, 10, 5, 15, 10, 2, 1, 0.5]
+            education = random.choices(edu_opts, weights=edu_weights, k=1)[0]
+            
+            # Employment: Enployed 70%, Free 15%, Unem 15% (including housewives, disabled, etc.)
+            emp_opts = ["在职", "待业", "自由职业"]
+            emp_weights = [70, 15, 15]
+            employment = random.choices(emp_opts, weights=emp_weights, k=1)[0]
+        else: # 60+
+            education = random.choices(["初中", "高中", "大专", "本科", "硕士", "博士"], weights=[70, 15, 10, 4, 0.8, 0.2], k=1)[0]
+            employment = random.choices(["退休", "自由职业"], weights=[95, 5], k=1)[0]
 
-        if work_province:
-            w_prov_list = [p for p in areas if work_province in p['name']] if work_province else areas
-            wp_data = self.random_element(w_prov_list)
-            wc_list = wp_data.get('children', [wp_data])
-            wc_data = self.random_element([c for c in wc_list if work_city in c['name']]) if work_city else self.random_element(wc_list)
-            wa_list = wc_data.get('children', [wc_data])
-            wa_data = self.random_element(wa_list)
-        elif is_high_end and not hometown_data['is_urban']:
-            t1_provs = ["北京", "上海", "广东", "江苏", "浙江"]
-            wp_data = self.random_element([p for p in areas if any(t1 in p['name'] for t1 in t1_provs)])
-            wc_data = self.random_element(wp_data.get('children', [wp_data]))
-            wa_data = self.random_element(wc_data.get('children', [wc_data]))
+        education = kwargs.get("education") or education
+        employment = kwargs.get("employment") or employment
+        user_job = kwargs.get("job")
+        if user_job and user_job not in ["无", "幼儿", "学生", "退休人员"]:
+            if not kwargs.get("employment"):
+                employment = "在职"
+
+
+        # Job deduction based strictly on employment status
+        if employment in ["在读", "全职学生"]:
+            job_val = "无" if age < 7 else "学生"
+        elif employment in ["待业", "待就业", "无业"]:
+            job_val = "无"
+        elif employment == "退休":
+            job_val = "退休人员"
         else:
-            wp_data, wc_data, wa_data = prov_data, city_data, area_data
+            job_val = self._get_realistic_job()
 
-        workplace_data = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end)
+        job = kwargs.get("job") or job_val
+
+        # Logic Hardening: Education Ceiling for Blue-Collar / Service
+        blue_collar_kw = ["普工", "操作", "车间", "流水线", "装配", "纺织", "细纱", "包装", "厨师", "服务员", "营业员", "保安", "保洁", "家政", "保姆", "洗碗", "店员", "前台", "收银", "司机", "快递", "外卖", "配送", "理发", "美容", "美发", "美体", "泥瓦工", "钢筋工", "搬运", "清洁", "维修", "机修", "钳工", "焊工", "木工", "电工", "水管工", "修理", "足疗", "推拿", "按摩", "传菜", "门卫", "导购", "促销", "保洁", "钟点工", "月嫂", "保安", "后厨", "切配", "迎宾", "收银", "杂工", "收发", "工人", "混凝土", "挖掘机", "砌筑", "抹灰", "水电工", "架子工", "电梯工", "钣金", "喷漆", "锅炉", "保安", "保洁", "环卫", "绿化", "搬运", "装卸", "分拣"]
+        if any(kw in job for kw in blue_collar_kw):
+            if education in ["博士", "硕士", "MBA"]:
+                education = self.random_element(["初中", "高中", "中专", "大专", "职业技能培训"])
+            elif education == "本科" and self.random_int(1, 100) > 10:  # 90% chance to downgrade Bachelors in these roles
+                education = self.random_element(["初中", "高中", "中专", "大专", "职业技能培训"])
+                
+        # Logic Hardening: Base Education Age Floor
+        if education == "博士" and age < 27:
+            age = self.random_int(27, 45)
+        elif education in ["硕士", "MBA"] and age < 24:
+            age = self.random_int(24, 40)
+        elif education == "本科" and age < 22:
+            age = self.random_int(22, 35)
+            
+        # Logic Hardening: Education/Age Door for Specific Jobs
+        # Always fix '研究生' to be realistic
+        if "研究生" in job:
+            if age > 35: age = self.random_int(22, 28)
+            employment = "在读"
+            job = "学生"
+            education = "本科"
+        
+        # Specific high-end jobs require older age and higher education
+        if any(kw in job for kw in ["总", "CEO", "总裁", "主任", "总监", "经理"]):
+            if age < 25: age = self.random_int(26, 45)
+            if education in ["幼儿", "小学", "初中", "高中", "中专", "大专", "职业技能培训"]: 
+                education = self.random_element(["本科", "硕士", "MBA"])
+                
+        if any(kw in job for kw in ["架构师", "专家", "研究员", "科学家", "教授", "算法"]):
+            if age < 28: age = self.random_int(28, 50)
+            if education in ["幼儿", "小学", "初中", "高中", "中专", "大专", "职业技能培训"]:
+                education = self.random_element(["本科", "硕士", "博士"])
+                
+        if any(kw in job for kw in ["工程师", "开发", "程序员"]):
+            if age < 22: age = self.random_int(22, 40)
+            if education in ["幼儿", "小学", "初中"]:
+                education = self.random_element(["大专", "本科"])
+
+
+
+        # 5. Resolve Social/Job constraints to determine Workplace
+        if employment in ["在读", "待业", "无业", "待就业", "退休"] or job in ["无", "幼儿", "学生", "退休人员"]:
+            workplace_data = {
+                "province": "无",
+                "city": "无",
+                "area": "无",
+                "address": "无"
+            }
+        else:
+            is_high_end = any(kw in job for kw in ["总", "CEO", "CTO", "高管", "总裁", "架构师", "专家"])
+
+            if work_province:
+                w_prov_list = [p for p in areas if work_province in p['name']] if work_province else areas
+                wp_data = self.random_element(w_prov_list)
+                wc_list = wp_data.get('children', [wp_data])
+                wc_data = self.random_element([c for c in wc_list if work_city in c['name']]) if work_city else self.random_element(wc_list)
+                wa_list = wc_data.get('children', [wc_data])
+                wa_data = self.random_element(wa_list)
+            elif is_high_end and not hometown_data['is_urban']:
+                t1_provs = ["北京", "上海", "广东", "江苏", "浙江"]
+                wp_data = self.random_element([p for p in areas if any(t1 in p['name'] for t1 in t1_provs)])
+                wc_data = self.random_element(wp_data.get('children', [wp_data]))
+                wa_data = self.random_element(wc_data.get('children', [wc_data]))
+            else:
+                wp_data, wc_data, wa_data = prov_data, city_data, area_data
+
+            workplace_data = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end, job=job, employment=employment)
 
         # 6. Generate Primary Phone based on Workplace
 
@@ -408,69 +579,30 @@ class PersonaProvider(BaseProvider):
         temp_domain = self.random_element(list(temp_mail_configs.keys()))
         temp_email = kwargs.get("temp_email") or f"{username}@{temp_domain}"
         # Dynamic Email Domain Weights based on Age and Job
-
-        # Social / background with age constraints
-        if age < 7:
-            education_opts = ["幼儿"]
-            employment_opts = ["在读"]
-        elif age < 13:
-            education_opts = ["小学"]
-            employment_opts = ["在读"]
-        elif age < 16:
-            education_opts = ["初中"]
-            employment_opts = ["在读"]
-        elif age < 19:
-            education_opts = ["高中", "中专"]
-            employment_opts = ["在读"]
-        elif age < 23:
-            education_opts = ["大专", "本科", "职业技能培训"]
-            employment_opts = ["在职", "待业", "在读"]
-        elif age < 60:
-            education_opts = ["大专", "本科", "硕士", "博士", "MBA"]
-            employment_opts = ["在职", "待业", "自由职业"]
-        else: # 60+
-            education_opts = ["高中", "大专", "本科", "硕士", "博士"]
-            employment_opts = ["退休", "自由职业"]
-
-        education = kwargs.get("education") or self.random_element(education_opts)
-        employment = kwargs.get("employment") or self.random_element(employment_opts)
-
-
-        # Job deduction based strictly on employment status
-        if employment in ["在读", "全职学生"]:
-            job_val = "无" if age < 7 else "学生"
-        elif employment in ["待业", "待就业", "无业"]:
-            job_val = "无"
-        elif employment == "退休":
-            job_val = "退休人员"
-        else:
-            job_val = self._get_realistic_job()
-
-        job = kwargs.get("job") or job_val
-
-        # Logic Hardening: Education/Age Door for Specific Jobs
-        if any(kw in job for kw in ["总", "CEO", "总裁", "主任"]):
-            if age < 30: age = 30 + (age % 10) # Enforce age
-            if education in ["幼儿", "小学", "初中", "高中", "中专", "大专"]: 
-                education = self.random_element(["本科", "硕士", "MBA"])
-        if any(kw in job for kw in ["架构师", "专家", "研究员", "科学家"]):
-            if education in ["幼儿", "小学", "初中", "高中", "中专", "大专"]:
-                education = self.random_element(["本科", "硕士", "博士"])
         
         # New: Salary constraint based on Job
         job_salary_mapping = [
-            (["总", "高管", "CEO", "CTO", "CFO", "总裁", "主任"], (30000, 150000)),
-            (["经理", "总监", "经理", "主管"], (12000, 45000)),
-            (["架构师", "专家", "科学家"], (25000, 80000)),
-            (["工程师", "开发", "程序员", "技术"], (10000, 40000)),
-            (["教师", "老师", "教授", "讲师", "教员"], (5000, 25000)),
-            (["医生", "护士", "医疗"], (6000, 40000)),
-            (["销售", "业务", "代理"], (4000, 35000)),
-            (["客服", "行政", "文员", "专员"], (4000, 12000)),
-            (["司机", "快递", "外卖", "配送"], (5000, 15000)),
-            (["厨师", "服务员", "营业员", "保安"], (3500, 10000)),
-            (["保洁", "家政", "保姆"], (3000, 7000)),
-            (["退休"], (3000, 12000)),
+            # High priority specific overrides
+            (["车间主任", "护理主任", "护士长", "大堂经理", "客服经理", "物业经理", "前台", "迎宾", "钟点工"], (4000, 15000)),
+            (["洗碗", "清洁", "搬运", "杂工", "收废品", "足疗", "推拿", "按摩", "泥瓦工", "钢筋工", "纺织", "细纱"], (3000, 8000)),
+            (["护士", "护理", "药剂师"], (4000, 15000)),
+            (["医生", "医师", "主任医师", "法医"], (8000, 45000)),
+            (["教师", "老师", "教授", "讲师", "教员", "助教", "教练"], (4000, 25000)),
+            (["工程师", "开发", "程序员", "技术", "IT", "设计"], (8000, 45000)),
+            (["架构师", "专家", "科学家", "研究员"], (20000, 80000)),
+            (["客服", "行政", "文员", "专员", "出纳", "助理", "人事"], (3500, 10000)),
+            (["销售", "业务", "代理", "市场", "公关", "媒介", "采购"], (4000, 30000)),
+            (["司机", "快递", "外卖", "配送", "骑手", "乘务", "船员"], (5000, 12000)),
+            (["厨师", "服务员", "营业员", "保安", "店员", "导购", "促销", "理发", "美容"], (3000, 8000)),
+            (["保洁", "家政", "保姆", "月嫂"], (3000, 9000)),
+            (["工人", "普工", "操作工", "钳工", "焊工", "木工", "电工", "水管工", "维修", "机修", "制造"], (4000, 10000)),
+            (["总监", "CEO", "CTO", "CFO", "总裁", "总经理", "副总", "行长"], (30000, 150000)),
+            (["经理", "主管", "主任", "领班", "组长", "厂长"], (8000, 35000)),
+            (["会计", "审计", "金融", "投资", "分析师", "顾问", "律师", "法务"], (8000, 40000)),
+            (["翻译", "编辑", "记者", "策划", "编导", "导演"], (6000, 25000)),
+            (["演员", "模特", "歌手", "主播", "摄影", "后期", "剪辑"], (5000, 30000)),
+            (["公务员", "干事", "书记", "局长", "科长", "处长", "警", "官", "军", "检察", "法官"], (5000, 18000)),
+            (["退休"], (2500, 10000)),
             (["学生", "小学", "初中", "高中", "幼儿", "无"], (0, 0))
         ]
 
@@ -493,7 +625,7 @@ class PersonaProvider(BaseProvider):
             city_factor = random.uniform(0.6, 0.8)
 
         # Rural factor (based on workplace environment)
-        rural_factor = random.uniform(0.6, 0.8) if not workplace_data.get('is_urban', True) else 1.0
+        rural_factor = random.uniform(0.6, 0.8) if workplace_data.get('is_urban') is False else 1.0
 
 
         if "在读" in employment or "待业" in employment or job in ["无", "幼儿", "学生"]:
@@ -536,10 +668,11 @@ class PersonaProvider(BaseProvider):
         else:
             final_salary = float(salary.replace("￥", "").replace(",", "")) if salary != "￥0" else 0
             # Tiered ownership probability
-            if final_salary > 20000: car_prob = 0.85
-            elif final_salary > 10000: car_prob = 0.60
-            elif final_salary > 5000: car_prob = 0.30
-            else: car_prob = 0.10
+            if final_salary > 30000: car_prob = 0.90
+            elif final_salary > 15000: car_prob = 0.65
+            elif final_salary > 8000: car_prob = 0.35
+            elif final_salary > 5000: car_prob = 0.10
+            else: car_prob = 0.01
             
             # Slightly reduce probability in Tier 1 cities due to license plate lottery/restrictions
             if any(t1 in str(workplace_data.get('city', '')) for t1 in ["北京", "上海", "广州", "深圳"]):
@@ -618,11 +751,17 @@ class PersonaProvider(BaseProvider):
 
         # Web Devices Based on Persona properties
         final_salary = float(salary.replace("￥", "").replace(",", "")) if salary != "￥0" else 0
-        if final_salary > 20000 or any(kw in job for kw in ["高管", "CEO", "总裁", "总监"]):
-            os_choices_weights = [("macOS Sonoma", 0.4), ("iOS 17", 0.4), ("Windows 11", 0.2)]
-            ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" if random.random() > 0.5 else "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        if final_salary > 15000 or any(kw in job for kw in ["高管", "CEO", "总裁", "总监"]):
+            # High income: iOS highly popular, Harmony strong, Android less dominant
+            os_choices_weights = [("iOS 17", 0.45), ("HarmonyOS 4", 0.35), ("macOS Sonoma", 0.1), ("Android 14", 0.1)]
+            ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" if random.random() > 0.5 else "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        elif final_salary > 6000:
+            # Middle income: Android leading, Harmony and iOS balanced
+            os_choices_weights = [("Android 14", 0.50), ("HarmonyOS 4", 0.25), ("iOS 17", 0.20), ("Windows 11", 0.05)]
+            ua = self.generator.user_agent()
         else:
-            os_choices_weights = [("Windows 10", 0.4), ("Windows 11", 0.2), ("Android 14", 0.3), ("iOS 17", 0.1)]
+            # Low income / Students: Android dominant (~75%), some HarmonyOS/iOS
+            os_choices_weights = [("Android 13", 0.45), ("Android 14", 0.30), ("HarmonyOS 3", 0.15), ("iOS 16", 0.08), ("Windows 10", 0.02)]
             ua = self.generator.user_agent()
             
         r_val = random.random()
@@ -914,16 +1053,18 @@ class PersonaProvider(BaseProvider):
         is_tech_foreign = any(kw in job_title for kw in ["架构师", "程序员", "开发", "IT", "研究员", "科学家", "外贸", "外资"])
         
         if a < 25:
-            # Young/Student: High QQ tendency (approx 70%), some 163 (20%)
-            providers = [("qq.com", 0.70), ("163.com", 0.20), ("outlook.com", 0.08)]
-            if is_tech_foreign: providers.append(("gmail.com", 0.02))
+            # Young/Student: Extreme QQ dominance (approx 80%), some 163 (15%)
+            providers = [("qq.com", 0.80), ("163.com", 0.15), ("outlook.com", 0.04)]
+            if is_tech_foreign: providers.append(("gmail.com", 0.01))
+            else: providers.append(("126.com", 0.01))
         elif a < 45:
-            # Working age: Mixed. QQ still popular but 163/126 rises.
-            providers = [("163.com", 0.40), ("qq.com", 0.35), ("126.com", 0.15), ("foxmail.com", 0.05), ("outlook.com", 0.05)]
-            if is_tech_foreign: providers.append(("gmail.com", 0.15)) # Tech workers 25-45 have higher Gmail chance
+            # Working age: Mixed. QQ heavily popular but 163/126 catches up for work.
+            providers = [("qq.com", 0.50), ("163.com", 0.35), ("126.com", 0.05), ("foxmail.com", 0.05), ("outlook.com", 0.03)]
+            if is_tech_foreign: providers.append(("gmail.com", 0.02))
+            else: providers.append(("yeah.net", 0.02))
         else:
-            # Older: 163, sina dominant
-            providers = [("163.com", 0.50), ("sina.com", 0.25), ("qq.com", 0.15), ("126.com", 0.08), ("hotmail.com", 0.02)]
+            # Older: 163, qq dominant
+            providers = [("163.com", 0.45), ("qq.com", 0.40), ("sina.com", 0.10), ("126.com", 0.03), ("hotmail.com", 0.02)]
         
         total = sum(w for p, w in providers)
         rand_val = random.uniform(0, total)
@@ -940,15 +1081,18 @@ class PersonaProvider(BaseProvider):
         rare_keywords = [
             "星探", "经纪人", "体验师", "鉴定师", "潜水", "飞行", "演艺", "教练", 
             "CEO", "总裁", "总经理", "总监", "首席", "外交", "基金经理", "操盘手", 
-            "架构师", "科学家", "研究员", "高级", "专家", "舰长"
+            "架构师", "科学家", "研究员", "高级", "专家", "舰长", "法官", "检察", "市长"
         ]
-        for _ in range(20):  # Prevent infinite loop
+        # Statistically shift jobs to grassroots level
+        for _ in range(50):  # Prevent infinite loop, increased attempts to find normal jobs
             candidate = self.generator.job()
             if not any(kw in candidate for kw in rare_keywords):
+                # To enforce "70% < 5000", if it's a regular white-collar job, slightly decrease its chance compared to blue collar
+                # We skip this deep filtering logic here as salaries are bound directly, but keeping high-end role scarcity is enough
                 return candidate
-            if random.random() < 0.02:  # 2% drop rate for rare jobs
+            if random.random() < 0.005:  # 0.5% drop rate for rare / elite jobs
                 return candidate
-        return self.generator.job()
+        return "销售员" # Fallback to a very common job if loop fails
 
     def _get_salary_by_job(self, job_name, job_salary_mapping, city_factor, rural_factor):
         base_val = 8000
