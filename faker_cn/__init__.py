@@ -120,11 +120,101 @@ class PersonaProvider(BaseProvider):
                 cls._villages_data = {}
         return cls._villages_data
 
-    def _ssn_checksum(self, ssn_17_digits: str) -> str:
-        factors = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-        check_codes = "10X98765432"
-        total = sum(int(ssn_17_digits[i]) * factors[i] for i in range(17))
-        return check_codes[total % 11]
+    def _ssn_checksum(self, s):
+        weight = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+        check_code = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+        sum_val = sum(int(s[i]) * weight[i] for i in range(17))
+        return check_code[sum_val % 11]
+
+    def strict_ssn(
+        self,
+        hometown_province: Optional[str] = None,
+        hometown_city: Optional[str] = None,
+        hometown_area: Optional[str] = None,
+        gender: Optional[str] = None,
+        birth_date: Optional[date] = None,
+        age_range: Optional[tuple] = None
+    ) -> str:
+        """
+        Generate a strictly valid 18-digit Chinese Resident Identity Card Number (SSN).
+        Parameters:
+            hometown_province: (Optional) Limit geographic province for the first 6 digits.
+            hometown_city: (Optional) Limit geographic city for the first 6 digits.
+            hometown_area: (Optional) Limit geographic area/county for the first 6 digits.
+            gender: (Optional) '男', 'M' or '女', 'F'. Affects the 17th digit (odd for male).
+            birth_date: (Optional) datetime.date object. Overrides age_range.
+            age_range: (Optional) (min_age, max_age). Ignored if birth_date is provided.
+        Returns:
+            A mathematically correct 18-digit string matching the requested constraints.
+        """
+        areas = self._load_areas()
+
+        # 1. Resolve Geography (First 6 digits)
+        prov_list = areas
+        if hometown_province:
+            filtered = [p for p in prov_list if hometown_province in p['name']]
+            prov_list = filtered if filtered else prov_list
+            prov_data = self.random_element(prov_list)
+        else:
+            # Reusing the existing population weights for demographic parity fallback
+            prov_weights_dict = {
+                "广东": 8.93, "山东": 7.19, "河南": 7.04, "江苏": 6.00, "四川": 5.93,
+                "河北": 5.28, "湖南": 4.71, "浙江": 4.57, "安徽": 4.32, "湖北": 4.09,
+                "广西": 3.55, "云南": 3.34, "江西": 3.20, "辽宁": 3.02, "福建": 2.94,
+                "陕西": 2.80, "贵州": 2.73, "新疆": 1.83, "甘肃": 1.77, "上海": 1.76,
+                "吉林": 1.71, "内蒙古": 1.70, "北京": 1.55, "重庆": 2.27, "黑龙江": 2.26,
+                "山西": 2.47, "天津": 0.98, "海南": 0.71, "宁夏": 0.51, "青海": 0.42,
+                "西藏": 0.26
+            }
+            w_list = [prov_weights_dict.get(p['name'].replace("省", "").replace("市", "").replace("自治区", "").replace("壮族", "").replace("回族", "").replace("维吾尔", ""), 1.0) for p in prov_list]
+            prov_data = random.choices(prov_list, weights=w_list, k=1)[0]
+
+        city_list = prov_data.get('children', [])
+        if not city_list: city_list = [prov_data]
+
+        if hometown_city:
+            filtered = [c for c in city_list if hometown_city in c['name']]
+            if filtered: city_list = filtered
+        city_data = self.random_element(city_list)
+
+        area_list = city_data.get('children', [])
+        if not area_list: area_list = [city_data]
+            
+        if hometown_area:
+            filtered = [a for a in area_list if hometown_area in a['name']]
+            if filtered: area_list = filtered
+        
+        area_data = self.random_element(area_list)
+        area_code = area_data.get('code', '110101') # Absolute fallback constraint
+
+        # 2. Resolve Birth Date (Middle 8 digits)
+        if birth_date:
+            b_date = birth_date
+        else:
+            if not age_range or len(age_range) != 2:
+                # Same demographic pyramid fallback
+                age_bucket = random.choices(["0-14", "15-59", "60-90"], weights=[17.95, 63.35, 18.70], k=1)[0]
+                if age_bucket == "0-14": age_range = (1, 14)
+                elif age_bucket == "15-59": age_range = (15, 59)
+                else: age_range = (60, 90)
+            b_date = self._random_date_between(age_range[0], age_range[1])
+            
+        date_str = b_date.strftime('%Y%m%d')
+
+        # 3. Resolve Gender (17th digit)
+        if gender not in ['男', '女', 'M', 'F']:
+            gender_val = random.choices(['男', '女'], weights=[51.24, 48.76], k=1)[0]
+        else:
+            gender_val = '男' if gender in ['男', 'M'] else '女'
+            
+        is_male = gender_val == '男'
+        gender_digit = self.random_element([1, 3, 5, 7, 9]) if is_male else self.random_element([0, 2, 4, 6, 8])
+
+        # 4. Generate & Validation Checksum
+        seq_code = f"{self.random_int(min=0, max=99):02d}"
+        ssn_17 = f"{area_code}{date_str}{seq_code}{gender_digit}"
+        checksum = self._ssn_checksum(ssn_17)
+        return f"{ssn_17}{checksum}"
 
     def _random_date_between(self, min_age: int, max_age: int) -> date:
         today = date.today()
@@ -401,14 +491,13 @@ class PersonaProvider(BaseProvider):
         
         marital_status = kwargs.get("marital_status") or marital_status
 
-        # 3. Generate SSN
-        date_str = birth_date.strftime('%Y%m%d')
-        seq_code = f"{self.random_int(min=0, max=99):02d}"
-        gender_digit = self.random_element([1, 3, 5, 7, 9]) if is_male else self.random_element([0, 2, 4, 6, 8])
-
-        ssn_17 = f"{area_code}{date_str}{seq_code}{gender_digit}"
-        checksum = self._ssn_checksum(ssn_17)
-        ssn = f"{ssn_17}{checksum}"
+        # 3. Generate Strict SSN
+        ssn = self.strict_ssn(
+            hometown_province=hometown_province,
+            hometown_city=hometown_city,
+            gender=gender_val,
+            birth_date=birth_date
+        )
 
         # 4. Address Logic extracted to class method
 
