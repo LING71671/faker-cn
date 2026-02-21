@@ -2,7 +2,8 @@ import json
 import os
 import random
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Optional, List, Dict, Any
+from textwrap import dedent
 
 from faker.providers import BaseProvider
 
@@ -11,6 +12,18 @@ class PersonaProvider(BaseProvider):
     """
     Provider for generating a logically consistent Chinese Persona.
     """
+    _enterprises_db = None
+
+    def _load_enterprises(self):
+        if self.__class__._enterprises_db is None:
+            db_path = os.path.join(os.path.dirname(__file__), 'data', 'enterprises.json')
+            if os.path.exists(db_path):
+                with open(db_path, 'r', encoding='utf-8') as f:
+                    self.__class__._enterprises_db = json.load(f)
+            else:
+                self.__class__._enterprises_db = {"_giants": [], "_sme": {}}
+        return self.__class__._enterprises_db
+
     _areas_data = None
     _phones_data = None
     _postcodes_data = None
@@ -498,12 +511,17 @@ class PersonaProvider(BaseProvider):
 
 
         # 5. Resolve Social/Job constraints to determine Workplace
+        company_name = "无"
+        company_uscc = "无"
+        
         if employment in ["在读", "待业", "无业", "待就业", "退休"] or job in ["无", "幼儿", "学生", "退休人员"]:
             workplace_data = {
                 "province": "无",
                 "city": "无",
                 "area": "无",
-                "address": "无"
+                "address": "无",
+                "company_name": company_name,
+                "company_uscc": company_uscc
             }
         else:
             is_high_end = any(kw in job for kw in ["总", "CEO", "CTO", "高管", "总裁", "架构师", "专家"])
@@ -523,12 +541,75 @@ class PersonaProvider(BaseProvider):
             else:
                 wp_data, wc_data, wa_data = prov_data, city_data, area_data
 
-            workplace_data = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end, job=job, employment=employment)
+            # Match enterprise based on industry mapping
+            ent_db = self._load_enterprises()
+            matched_company = None
+            is_tech = any(kw in job for kw in ["架构师", "专家", "研究员", "研发", "科学家", "总监", "经理", "开发", "程序员", "IT", "互联网", "软件", "系统", "产品", "运营"])
+            is_finance = any(kw in job for kw in ["银行", "出纳", "财务", "金融", "投资", "风控", "保险", "理财", "资金", "信贷"])
+            is_manufacture = any(kw in job for kw in ["质量", "车间", "工人", "普工", "机修", "制造", "产线", "组装", "仓管", "包装", "纺织", "焊接", "操作"])
+            
+            target_industry = ""
+            if is_tech: target_industry = "信息传输、软件和信息技术服务业"
+            elif is_finance: target_industry = "金融业"
+            elif is_manufacture: target_industry = "制造业"
+                
+            # Try to catch a giant if high end or pure luck
+            if target_industry and random.random() < 0.05:
+                giant_cands = [c for c in ent_db.get("_giants", []) if c["industry"] == target_industry and c["province"] in wp_data["name"]]
+                if giant_cands:
+                    matched_company = random.choice(giant_cands)
+                    
+            if not matched_company:
+                # Fallback to local SMEs
+                local_smes = ent_db.get("_sme", {}).get(wp_data["name"].replace("省", "").replace("市", "").replace("自治区", "").replace("壮族", "").replace("回族", "").replace("维吾尔", ""), [])
+                if local_smes:
+                    valid_smes = [c for c in local_smes if not target_industry or c["industry"] == target_industry]
+                    city_matched_smes = [c for c in valid_smes if c["city"] == wc_data["name"]]
+                    
+                    if city_matched_smes:
+                        matched_company = random.choice(city_matched_smes)
+                    elif valid_smes:
+                        matched_company = random.choice(valid_smes)
+                    else:
+                        matched_company = random.choice(local_smes)
+            
+            base_address = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end, job=job, employment=employment)
+            
+            if matched_company:
+                company_name = matched_company["name"]
+                company_uscc = matched_company["uscc"]
+                if matched_company.get("address"):
+                    # Giant company has hardcoded real address
+                    workplace_address_str = matched_company["address"]
+                else:
+                    # Sync city back from company so name matches the address if we had a fallback
+                    if matched_company["city"] != wc_data["name"]:
+                        wc_data = next((c for c in wp_data.get('children', [wp_data]) if c['name'] == matched_company["city"]), wc_data)
+                        wa_list = wc_data.get('children', [wc_data])
+                        wa_data = self.random_element(wa_list)
+                        base_address = self._generate_full_address(wp_data, wc_data, wa_data, villages, f_urban=is_high_end, job=job, employment=employment)
+                        
+                    if any(kw in job for kw in ["医生", "护士", "老师", "教授", "公务员"]):
+                        workplace_address_str = base_address["address"] # Keep logic for hospitals/schools
+                    else:
+                        if "号" in base_address["address"]:
+                            workplace_address_str = base_address["address"].split("号")[0] + f"号{company_name}"
+                        else:
+                            workplace_address_str = base_address["address"] + f"附楼{company_name}"
+            else:
+                workplace_address_str = base_address["address"]
+
+            workplace_data = {
+                "province": wp_data['name'],
+                "city": wc_data['name'],
+                "area": wa_data['name'],
+                "address": workplace_address_str,
+                "company_name": company_name,
+                "company_uscc": company_uscc
+            }
 
         # 6. Generate Primary Phone based on Workplace
-
-        # 6. Generate Primary Phone based on Workplace
-        primary_phone = self._get_phone_number(phones, str(workplace_data['province']), str(workplace_data['city']))
+        primary_phone = self._get_phone_number(self._load_phones(), str(workplace_data['province']), str(workplace_data['city']))
 
         # 7. Determine Name (Gender already known) with Era-based Probabilities
 # 
@@ -878,7 +959,9 @@ class PersonaProvider(BaseProvider):
                 "province": workplace_data['province'],
                 "city": workplace_data['city'],
                 "area": workplace_data['area'],
-                "address": workplace_data['address']
+                "address": workplace_data['address'],
+                "company_name": workplace_data.get('company_name', "无"),
+                "company_uscc": workplace_data.get('company_uscc', "无")
             },
             "asset": {
                 "vehicle_plate": vehicle_plate
