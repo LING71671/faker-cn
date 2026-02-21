@@ -701,13 +701,10 @@ class PersonaProvider(BaseProvider):
         primary_phone = self._get_phone_number(self._load_phones(), str(workplace_data['province']), str(workplace_data['city']))
 
         # 7. Determine Name (Gender already known) with Era-based Probabilities
-# 
-# 
-
         if kwargs.get("name"):
             name = kwargs.get("name")
         else:
-            name = self._generate_era_name(birth_date.year, is_male)
+            name = self.era_name(birth_date.year, gender_val)
 
         # 8. Ethnicity and Identity (Geo-aware distribution)
         ethnicity = kwargs.get("ethnicity")
@@ -1148,55 +1145,85 @@ class PersonaProvider(BaseProvider):
         try: return self.generator.phone_number()
         except AttributeError: return f"13{self.random_int(min=0,max=9)}{self.random_int(min=0,max=99999999):08d}"
 
-    def _generate_era_name(self, birth_year, is_m):
-        # 1. 性别与时代的特征字库 (Strict Gender Separation)
-        # 传统：50-70年代倾向于强壮、报国、温婉、家务
-        traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛", "正", "辉", "力", "明", "永", "才"]
-        traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴", "云", "莲", "玲", "巧", "桂", "芝"]
+    def era_given_name(self, birth_year: Optional[int] = None, gender: Optional[str] = None) -> str:
+        if not gender:
+            gender = random.choices(['男', '女'], weights=[51.24, 48.76], k=1)[0]
+        is_m = gender in ['男', 'M']
+
+        if birth_year is None:
+            age_bucket = random.choices(["0-14", "15-59", "60-90"], weights=[17.95, 63.35, 18.70], k=1)[0]
+            if age_bucket == "0-14":
+                age = self.random_int(1, 14)
+            elif age_bucket == "15-59":
+                age = self.random_int(15, 59)
+            else:
+                age = self.random_int(60, 90)
+            birth_year = date.today().year - age
+
+        # 1. 性别与时代的特征字库 (Strict Era & Gender Separation)
+        # 传统 (Pre-1970)：倾向于强壮、报国、温婉、家务
+        traditional_m = ["军", "国", "建", "华", "平", "伟", "强", "勇", "明", "涛", "正", "辉", "力", "永", "才", "援朝", "跃进", "胜", "卫东", "志", "德", "宝", "铁", "贵", "根"]
+        traditional_f = ["兰", "梅", "英", "珍", "芬", "芳", "秀", "娟", "萍", "琴", "云", "莲", "玲", "巧", "桂", "芝", "秀英", "桂兰", "玉华", "凤", "香", "红", "霞", "娣", "妹"]
         
-        # 中期：80-90年代倾向于单字，追求中性或文雅
-        mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞", "博", "涛", "洋", "明", "毅"]
-        mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹", "琳", "慧", "洁", "微", "娜", "露"]
+        # 中期 (1970-1990)：单字多，追求中性、稳重或文雅
+        mid_m = ["杰", "磊", "超", "斌", "鹏", "鑫", "峰", "健", "新", "飞", "博", "涛", "洋", "明", "毅", "宇", "帅", "辉", "亮", "伟", "勇", "刚", "强", "平"]
+        mid_f = ["静", "敏", "燕", "雪", "婷", "莉", "娜", "丹", "倩", "莹", "琳", "慧", "洁", "微", "露", "丽", "芳", "娟", "艳", "秀", "萍", "梅", "玲", "云"]
         
-        # 现代：00-20年代倾向于古风、诗意、四个字或重叠
-        modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航", "嘉木", "一凡", "子安", "沐宸"]
-        modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵", "梦瑶", "思语", "若曦", "语珂"]
+        # 千禧 (1990-2010)：双字增多，注重文化氛围
+        millennium_m = ["宇", "航", "浩", "轩", "泽", "睿", "渊", "皓", "哲", "晨", "铭", "豪", "俊", "杰", "凡", "鑫", "宇轩", "浩宇", "俊杰", "子轩", "浩然"]
+        millennium_f = ["欣", "怡", "涵", "萱", "彤", "琪", "悦", "馨", "瑶", "语", "妍", "玥", "雨", "佳", "欣怡", "梓涵", "紫涵", "可馨", "梦瑶", "诗涵"]
+
+        # 现代 (2010+)：古风、诗意、偏网文气质
+        modern_m = ["浩宇", "子轩", "宇轩", "浩然", "梓睿", "铭泽", "子墨", "宇航", "嘉木", "一凡", "子安", "沐宸", "俊熙", "奕辰", "宇辰", "浩轩", "沐阳", "亦辰"]
+        modern_f = ["梓涵", "欣怡", "梓萱", "语彤", "雨琪", "芯冉", "子涵", "诗涵", "梦瑶", "思语", "若曦", "语珂", "悠然", "婉清", "芷若", "沐瑶", "语嫣"]
+
+        generic_prob = 0.2
+        if birth_year < 1970:
+            trad_prob, mid_prob, mil_prob = 0.70, 0.10, 0.0
+        elif birth_year < 1990:
+            trad_prob, mid_prob, mil_prob = 0.10, 0.60, 0.10
+        elif birth_year < 2010:
+            trad_prob, mid_prob, mil_prob = 0.05, 0.15, 0.40
+        else: # 2010+
+            trad_prob, mid_prob, mil_prob = 0.01, 0.04, 0.15
 
         r_val = random.random()
-        
-        # 基础 Faker 概率
-        generic_prob = 0.3
-        
-        if birth_year < 1975:
-            trad_prob = 0.6
-            mid_prob = 0.05
-        elif birth_year < 1995:
-            trad_prob = 0.1
-            mid_prob = 0.5
-        elif birth_year < 2010:
-            trad_prob = 0.05
-            mid_prob = 0.2
-        else: # 2010+
-            trad_prob = 0.02
-            mid_prob = 0.08
-            
-        modern_prob = 1.0 - generic_prob - trad_prob - mid_prob
-
-        # 始终先获取姓氏，确保架构统一
-        surname = self.generator.last_name()
-
         if r_val < generic_prob:
-             # 使用原生 Faker 的名（而非全名），避免性别混淆或重复姓氏
-             given_name = self.generator.first_name_male() if is_m else self.generator.first_name_female()
-             return f"{surname}{given_name}"
+             return self.generator.first_name_male() if is_m else self.generator.first_name_female()
         elif r_val < generic_prob + trad_prob:
-             name_char = self.random_element(traditional_m) if is_m else self.random_element(traditional_f)
+             return self.random_element(traditional_m) if is_m else self.random_element(traditional_f)
         elif r_val < generic_prob + trad_prob + mid_prob:
-             name_char = self.random_element(mid_m) if is_m else self.random_element(mid_f)
+             return self.random_element(mid_m) if is_m else self.random_element(mid_f)
+        elif r_val < generic_prob + trad_prob + mid_prob + mil_prob:
+             return self.random_element(millennium_m) if is_m else self.random_element(millennium_f)
         else:
-             name_char = self.random_element(modern_m) if is_m else self.random_element(modern_f)
-             
-        return f"{surname}{name_char}"
+             return self.random_element(modern_m) if is_m else self.random_element(modern_f)
+
+    def era_name(self, birth_year: Optional[int] = None, gender: Optional[str] = None) -> str:
+        """
+        Generate a highly realistic Chinese full name matching the historical era and gender.
+        """
+        surname = self.generator.last_name()
+        given_name = self.era_given_name(birth_year, gender)
+        return f"{surname}{given_name}"
+
+    def name(self) -> str:
+        return self.era_name()
+
+    def name_male(self) -> str:
+        return self.era_name(gender='男')
+
+    def name_female(self) -> str:
+        return self.era_name(gender='女')
+        
+    def first_name(self) -> str:
+        return self.era_given_name()
+
+    def first_name_male(self) -> str:
+        return self.era_given_name(gender='男')
+
+    def first_name_female(self) -> str:
+        return self.era_given_name(gender='女')
 
     def _generate_realistic_postcode(self, full_pc_index, p_n, c_n, a_n):
         # Precision candidates (Specific to General)
