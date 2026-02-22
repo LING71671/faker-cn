@@ -177,3 +177,9 @@ wheel_files.txt
 test_results.txt
 test_out.txt
 .gemini/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local

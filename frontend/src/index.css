@@ -1,0 +1,126 @@
+:root {
+  --bg-color: #050508;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --primary-glow: #00E5FF;
+  --secondary-glow: #B300FF;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  font-family: 'Space Grotesk', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at 50% 0%, #1a1a2e 0%, var(--bg-color) 60%);
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  max-width: 1200px;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+/* Cyber Actions */
+.cyber-button {
+  background: transparent;
+  color: var(--primary-glow);
+  border: 1px solid var(--primary-glow);
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.2), inset 0 0 10px rgba(0, 229, 255, 0.1);
+}
+
+.cyber-button:hover, .cyber-button:focus {
+  background: var(--primary-glow);
+  color: var(--bg-color);
+  box-shadow: 0 0 20px var(--primary-glow), inset 0 0 10px rgba(255,255,255,0.5);
+  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+  outline: none;
+}
+
+.cyber-button.secondary {
+  border-color: var(--secondary-glow);
+  color: var(--secondary-glow);
+  box-shadow: 0 0 10px rgba(179, 0, 255, 0.2), inset 0 0 10px rgba(179, 0, 255, 0.1);
+}
+
+.cyber-button.secondary:hover {
+  background: var(--secondary-glow);
+  color: var(--bg-color);
+  box-shadow: 0 0 20px var(--secondary-glow);
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 10px rgba(0, 229, 255, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(0, 229, 255, 0.4); }
+  100% { box-shadow: 0 0 10px rgba(0, 229, 255, 0.2); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Typography tweaks */
+h1, h2, h3, h4 {
+  margin-top: 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, var(--primary-glow), #4da8da);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
